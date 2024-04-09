@@ -9,18 +9,23 @@ router = APIRouter()
 @router.get("/catalog/", tags=["catalog"])
 def get_catalog():
     """
-    Each unique item combination must have only a single price.
+    Dynamically fetches the catalog from the global_inventory table,
+    focusing on green potions.
     """
+    with db.engine.begin() as connection:
+        # Fetch the current state of green potions and gold
+        inventory_query = "SELECT num_green_potions, gold FROM global_inventory"
+        result = connection.execute(sqlalchemy.text(inventory_query)).first()
+        
+        # If there's no inventory data, assume initialization state
+        num_green_potions, gold = result if result else (0, 100)
 
-    return [
-            {
-                "sku": "RED_POTION_0",
-                "name": "red potion",
-                "quantity": 1,
-                "price": 50,
-                "potion_type": [100, 0, 0, 0],
-            }
-        ]
-
-with db.engine.begin() as connection:
-        result = connection.execute(sqlalchemy.text(sql_to_execute))
+        catalog_response = [{
+            "sku": "GREEN_POTION",
+            "name": "Green Potion",
+            "quantity": num_green_potions,
+            "price": 50,  # Assuming a flat price; adjust as needed
+            "potion_type": [0, 100, 0, 0]  # Representing green potion composition
+        }]
+        
+    return catalog_response

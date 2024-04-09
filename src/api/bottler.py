@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends
 from enum import Enum
 from pydantic import BaseModel
 from src.api import auth
+from fastapi import HTTPException
 
 router = APIRouter(
     prefix="/bottler",

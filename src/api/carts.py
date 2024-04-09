@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 from src.api import auth
 from enum import Enum
+from fastapi import HTTPException
 
 router = APIRouter(
     prefix="/carts",

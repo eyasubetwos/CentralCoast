@@ -77,20 +77,28 @@ class Customer(BaseModel):
     level: int
 
 from datetime import datetime
+from sqlalchemy import text
 
 @router.post("/visits/{visit_id}")
 def post_visits(visit_id: int, customers: list[Customer]):
     with db.engine.begin() as connection:
         for customer in customers:
-            insert_query = sqlalchemy.text(
+            
+            params = {
+                "visit_id": visit_id,
+                "customer_name": customer.customer_name,
+                "character_class": customer.character_class,
+                "level": customer.level,
+                "visit_timestamp": datetime.now()
+            }
+            insert_query = text(
                 "INSERT INTO customer_visits (visit_id, customer_name, character_class, level, visit_timestamp) "
                 "VALUES (:visit_id, :customer_name, :character_class, :level, :visit_timestamp)"
             )
-            connection.execute(insert_query, visit_id=visit_id, customer_name=customer.customer_name, 
-                               character_class=customer.character_class, level=customer.level, 
-                               visit_timestamp=datetime.now())
+            connection.execute(insert_query, params)
     
     return {"status": "Customer visits recorded successfully."}
+
 
 
 @router.post("/")

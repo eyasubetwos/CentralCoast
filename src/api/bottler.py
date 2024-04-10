@@ -42,12 +42,13 @@ def get_bottle_plan():
 
         if max_potions > 0:
             new_num_green_ml = num_green_ml - (max_potions * potion_requirement_ml)
-            update_liquid_query = "UPDATE global_inventory SET num_green_ml = :new_ml WHERE potion_type = 'green'"
+            update_liquid_query = "UPDATE global_inventory SET num_green_ml = :new_ml"
             connection.execute(sqlalchemy.text(update_liquid_query), new_ml=new_num_green_ml)
 
             return [{"potion_type": [0, 100, 0, 0], "quantity": max_potions}]
         else:
             raise HTTPException(status_code=400, detail="Insufficient liquid for bottling any potions.")
+
 
 if __name__ == "__main__":
     print(get_bottle_plan())

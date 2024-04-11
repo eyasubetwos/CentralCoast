@@ -17,7 +17,14 @@ class Timestamp(BaseModel):
 @router.post("/current_time")
 def post_time(timestamp: Timestamp):
     """
-    Share current time.
+    Log the current time to the database.
     """
-    return "OK"
-
+    try:
+        with db.engine.begin() as connection:
+            insert_query = sqlalchemy.text(
+                "INSERT INTO game_time (day, hour) VALUES (:day, :hour)"
+            )
+            connection.execute(insert_query, day=timestamp.day, hour=timestamp.hour)
+        return {"status": "Current time logged successfully."}
+    except Exception as e:
+        return {"error": str(e)}

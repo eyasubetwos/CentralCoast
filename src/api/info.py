@@ -15,18 +15,13 @@ class GameTime(BaseModel):
     hour: int
 
 @router.post("/current_time")
-def post_time(game_time: GameTime):
-    """
-    Logs the current time to the database in a table designed to store such logs.
-    """
+def post_time(timestamp: Timestamp):
     try:
         with db.engine.begin() as connection:
             insert_query = sqlalchemy.text(
                 "INSERT INTO game_time (day, hour) VALUES (:day, :hour)"
             )
-            connection.execute(insert_query, day=game_time.day, hour=game_time.hour)
+            connection.execute(insert_query, day=timestamp.day, hour=timestamp.hour)
         return {"status": "Current time logged successfully."}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
+        raise HTTPException(status_code=500, detail=f"Failed to log time: {str(e)}")

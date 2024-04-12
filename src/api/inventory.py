@@ -37,16 +37,23 @@ def get_inventory_audit():
 
 @router.post("/plan")
 def update_inventory_capacity(capacity_purchase: CapacityPurchase):
+    if capacity_purchase.potion_capacity < 0 or capacity_purchase.ml_capacity < 0:
+        raise HTTPException(status_code=400, detail="Capacity values must be positive.")
+
     with db.engine.begin() as connection:
         update_query = sqlalchemy.text("""
             UPDATE capacity_inventory
             SET potion_capacity = potion_capacity + :potion_capacity,
                 ml_capacity = ml_capacity + :ml_capacity
+            WHERE potion_capacity + :potion_capacity >= 0 AND
+                  ml_capacity + :ml_capacity >= 0
         """)
-        connection.execute(update_query, potion_capacity=capacity_purchase.potion_capacity, ml_capacity=capacity_purchase.ml_capacity)
+        result = connection.execute(update_query, potion_capacity=capacity_purchase.potion_capacity, ml_capacity=capacity_purchase.ml_capacity)
+        
+        if result.rowcount == 0:
+            raise HTTPException(status_code=400, detail="Failed to update inventory capacity due to invalid capacity values.")
 
         return {"status": "Inventory capacity updated successfully."}
-
 @router.post("/deliver/{order_id}")
 def deliver_capacity_plan(order_id: int, capacity_purchase: CapacityPurchase):
     with db.engine.begin() as connection:

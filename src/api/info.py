@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends
 import sqlalchemy
+import traceback
 from src import database as db
 from pydantic import BaseModel
 from src.api import auth
@@ -25,4 +26,5 @@ def post_time(timestamp: Timestamp):
             connection.execute(insert_query, day=timestamp.day, hour=timestamp.hour)
         return {"status": "Current time logged successfully."}
     except Exception as e:
+	traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to log time: {str(e)}")

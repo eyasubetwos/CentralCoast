@@ -10,9 +10,10 @@ router = APIRouter(
     dependencies=[Depends(auth.get_api_key)],
 )
 
-class GameTime(BaseModel):
+class Timestamp(BaseModel):  # Ensure this class is defined correctly
     day: str
     hour: int
+
 
 @router.post("/current_time")
 def post_time(timestamp: Timestamp):

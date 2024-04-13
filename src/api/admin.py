@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 import sqlalchemy
 from src import database as db
 from src.api import auth
+import logging
 
 router = APIRouter(
     prefix="/admin",
@@ -10,9 +11,10 @@ router = APIRouter(
 )
 
 @router.post("/reset")
-def reset_game_state():
+def reset():
     """
-    Resets the game state by clearing inventories, resetting gold, and other configurations.
+    Reset the game state. Gold goes to 100, all potions are removed from
+    inventory, and all barrels are removed from inventory. Carts are all reset.
     """
     try:
         with db.engine.begin() as connection:
@@ -38,6 +40,11 @@ def reset_game_state():
             connection.execute(sqlalchemy.text("DELETE FROM carts"))
             connection.execute(sqlalchemy.text("DELETE FROM cart_items"))
 
+            logging.info("Game state has been reset successfully.")
         return {"status": "Game state reset successfully."}
+    except sqlalchemy.exc.SQLAlchemyError as e:
+        logging.error(f"Database error during reset: {e}")
+        raise HTTPException(status_code=500, detail="Database error during reset.")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logging.error(f"Unexpected error during reset: {e}")
+        raise HTTPException(status_code=500, detail="Unexpected error during reset.")

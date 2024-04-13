@@ -23,17 +23,24 @@ class Barrel(BaseModel):
 @router.post("/deliver/{order_id}")
 def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
     with db.engine.begin() as connection:
+        total_cost = sum(barrel.price * barrel.quantity for barrel in barrels_delivered if barrel.potion_type == [0, 100, 0, 0])
+        current_gold = connection.execute(sqlalchemy.text("SELECT gold FROM global_inventory WHERE id = 1")).scalar()
+
+        if current_gold < total_cost:
+            raise HTTPException(status_code=400, detail="Not enough gold to complete the transaction.")
+
         for barrel in barrels_delivered:
-            if barrel.potion_type == [0, 100, 0, 0]:  # Assuming [0, 100, 0, 0] indicates green potion
+            if barrel.potion_type == [0, 100, 0, 0]:
                 update_query = sqlalchemy.text("""
                     UPDATE global_inventory
                     SET num_green_ml = num_green_ml + :added_ml,
                         gold = gold - :spent_gold
-                    WHERE id = 1  # Assuming there's only one row and its ID is 1
+                    WHERE id = 1
                 """)
                 connection.execute(update_query, added_ml=(barrel.ml_per_barrel * barrel.quantity), spent_gold=(barrel.price * barrel.quantity))
 
     return {"status": "Barrels delivered and inventory updated."}
+
 
 @router.post("/plan")
 def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):

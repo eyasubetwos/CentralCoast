@@ -1,10 +1,8 @@
 import sqlalchemy
 from src import database as db
-from fastapi import APIRouter, Depends
-from enum import Enum
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from src.api import auth
-from fastapi import HTTPException
 
 router = APIRouter(
     prefix="/bottler",
@@ -20,7 +18,7 @@ class PotionInventory(BaseModel):
 def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int):
     with db.engine.begin() as connection:
         for potion in potions_delivered:
-            if potion.potion_type == [0, 100, 0, 0]:  # Green potion type
+            if potion.potion_type == [0, 100, 0, 0]:  # Assuming green potion type
                 inventory_query = "SELECT num_green_potions FROM global_inventory"
                 inventory_result = connection.execute(sqlalchemy.text(inventory_query)).first()
                 if inventory_result:
@@ -28,6 +26,7 @@ def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int
                     update_query = sqlalchemy.text("""
                         UPDATE global_inventory 
                         SET num_green_potions = :new_num
+                        WHERE id = 1  # Assuming there is only one inventory row
                     """)
                     connection.execute(update_query, new_num=new_num_green_potions)
 
@@ -36,14 +35,15 @@ def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int
 @router.post("/plan")
 def get_bottle_plan():
     with db.engine.begin() as connection:
-        liquid_query = "SELECT num_green_ml FROM global_inventory"
+        liquid_query = "SELECT num_green_ml FROM global_inventory WHERE id = 1"
         liquid_result = connection.execute(sqlalchemy.text(liquid_query)).first()
-        if liquid_result and liquid_result[0] >= 100:  # At least 100ml needed to bottle
-            max_potions = liquid_result[0] // 100  # Determine how many potions can be made
+        if liquid_result and liquid_result[0] >= 100:
+            max_potions = liquid_result[0] // 100
             new_num_green_ml = liquid_result[0] - (max_potions * 100)
             update_liquid_query = sqlalchemy.text("""
                 UPDATE global_inventory 
                 SET num_green_ml = :new_ml
+                WHERE id = 1
             """)
             connection.execute(update_liquid_query, new_ml=new_num_green_ml)
             return [{"potion_type": [0, 100, 0, 0], "quantity": max_potions}]

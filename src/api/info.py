@@ -23,7 +23,8 @@ def post_time(timestamp: Timestamp):
             insert_query = sqlalchemy.text(
                 "INSERT INTO game_time (day, hour) VALUES (:day, :hour)"
             )
-            connection.execute(insert_query, day=timestamp.day, hour=timestamp.hour)
+            # Make sure parameters are correctly passed as a dictionary
+            connection.execute(insert_query, {'day': timestamp.day, 'hour': timestamp.hour})
         return {"status": "Current time logged successfully."}
     except SQLAlchemyError as e:
         logging.error(f"SQLAlchemy Error when logging time: {e}")

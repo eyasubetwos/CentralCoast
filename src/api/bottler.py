@@ -35,20 +35,22 @@ def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int
 @router.post("/plan")
 def get_bottle_plan():
     with db.engine.begin() as connection:
+        # Assuming id=1 is the identifier for your primary (and only) global inventory record
         liquid_query = "SELECT num_green_ml FROM global_inventory WHERE id = 1"
         liquid_result = connection.execute(sqlalchemy.text(liquid_query)).first()
-        if liquid_result and liquid_result[0] >= 100:
-            max_potions = liquid_result[0] // 100
-            new_num_green_ml = liquid_result[0] - (max_potions * 100)
-            update_liquid_query = sqlalchemy.text("""
-                UPDATE global_inventory 
-                SET num_green_ml = :new_ml
-                WHERE id = 1
-            """)
-            connection.execute(update_liquid_query, new_ml=new_num_green_ml)
-            return [{"potion_type": [0, 100, 0, 0], "quantity": max_potions}]
-        else:
+
+        if not liquid_result or liquid_result[0] < 100:
             raise HTTPException(status_code=400, detail="Insufficient liquid for bottling any potions.")
+
+        max_potions = liquid_result[0] // 100
+        new_num_green_ml = liquid_result[0] - (max_potions * 100)
+        update_liquid_query = sqlalchemy.text("""
+            UPDATE global_inventory 
+            SET num_green_ml = :new_ml
+            WHERE id = 1
+        """)
+        connection.execute(update_liquid_query, new_ml=new_num_green_ml)
+        return [{"potion_type": [0, 100, 0, 0], "quantity": max_potions}]
 
 if __name__ == "__main__":
     print(get_bottle_plan())

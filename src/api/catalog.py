@@ -28,19 +28,22 @@ def get_catalog():
                 "name": "Green Potion",
                 "quantity": num_green_potions,
                 "price": 50,  # Example price
-                "potion_type": [0, 100, 0, 0]  # Potion composition
+                "potion_type": [0, 100, 0, 0],  # Potion composition
+                "sku": "GP-001"
             },
             "RED_POTION": {
                 "name": "Red Potion",
                 "quantity": num_red_potions,
                 "price": 75,  # Example price
-                "potion_type": [100, 0, 0, 0]  # Potion composition
+                "potion_type": [100, 0, 0, 0],  # Potion composition
+                "sku": "RP-001"
             },
             "BLUE_POTION": {
                 "name": "Blue Potion",
                 "quantity": num_blue_potions,
                 "price": 65,  # Example price
-                "potion_type": [0, 0, 100, 0]  # Potion composition
+                "potion_type": [0, 0, 100, 0],  # Potion composition
+                "sku": "BP-001"
             }
         }
 
@@ -48,12 +51,12 @@ def get_catalog():
         for sku, details in potion_types.items():
             if details["quantity"] > 0:  # Add to catalog only if the potion is available
                 catalog_response.append({
-                    "sku": sku,
+                    "sku": details["sku"],
                     "name": details["name"],
                     "quantity": details["quantity"],
                     "price": details["price"],
                     "potion_type": details["potion_type"]
                 })
         
-        # Return the catalog response
+        # Return the catalog response, which will be an empty list if no potions are available
         return catalog_response

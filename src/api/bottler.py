@@ -40,9 +40,7 @@ def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int
 
 @router.post("/plan")
 def get_bottle_plan():
-    with db.engine.begin() as connection:
-        # Begin transaction to ensure inventory integrity
-        transaction = connection.begin()
+    with db.engine.begin() as connection:  # This starts a transaction context
         try:
             liquid_query = sqlalchemy.text("""
                 SELECT num_red_ml, num_green_ml, num_blue_ml
@@ -65,17 +63,13 @@ def get_bottle_plan():
                     num_blue_ml = num_blue_ml - :blue_ml_used
                 WHERE id = 1
             """)
+            connection.execute(update_liquid_query, 
+                               red_ml_used=max_red_potions * 100, 
+                               green_ml_used=max_green_potions * 100,
+                               blue_ml_used=max_blue_potions * 100)
 
-            connection.execute(
-                               update_liquid_query, 
-                               {
-                                  'red_ml_used': max_red_potions * 100, 
-                                  'green_ml_used': max_green_potions * 100,
-                                  'blue_ml_used': max_blue_potions * 100
-                               }
-                              )
-
-            transaction.commit()  # Commit changes to ensure data consistency
+            # The transaction is automatically committed here if no error occurs.
+            # If an exception is raised, a rollback happens automatically as well.
 
             bottling_plan = []
             if max_red_potions > 0:
@@ -86,9 +80,12 @@ def get_bottle_plan():
                 bottling_plan.append({"potion_type": [0, 0, 100, 0], "quantity": max_blue_potions})
 
             return bottling_plan
+
         except Exception as e:
-            transaction.rollback()  # Roll back on any error
+            # Since the 'with' context is managing the transaction, a manual rollback is not needed here.
+            # The context manager will automatically roll back the transaction if an exception occurs.
             raise HTTPException(status_code=500, detail=str(e))
+
 
 if __name__ == "__main__":
     print(get_bottle_plan())

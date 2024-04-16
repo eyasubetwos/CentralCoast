@@ -56,9 +56,16 @@ def set_item_quantity(cart_id: int, cart_item: CartItem):
             VALUES (:cart_id, :items_sku, :quantity)
             ON CONFLICT (cart_id, items_sku) DO UPDATE SET quantity = :quantity
         """)
-        connection.execute(update_query, cart_id=cart_id, items_sku=cart_item.item_sku, quantity=cart_item.quantity)
+        # Properly passing parameters as a dictionary
+        params = {
+            'cart_id': cart_id,
+            'items_sku': cart_item.item_sku,
+            'quantity': cart_item.quantity
+        }
+        connection.execute(update_query, params)  # Pass parameters as a dictionary
 
         return {"status": "Cart updated successfully."}
+
 
 # Checkout cart
 @router.post("/{cart_id}/checkout")

@@ -78,5 +78,5 @@ def get_bottle_plan():
             transaction.rollback()  # Roll back on any error
             raise HTTPException(status_code=500, detail=str(e))
 
-if name == "main":
+if __name__ == "__main__":
     print(get_bottle_plan())

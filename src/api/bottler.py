@@ -63,10 +63,14 @@ def get_bottle_plan():
                     num_blue_ml = num_blue_ml - :blue_ml_used
                 WHERE id = 1
             """)
-            connection.execute(update_liquid_query, 
-                               red_ml_used=max_red_potions * 100, 
-                               green_ml_used=max_green_potions * 100,
-                               blue_ml_used=max_blue_potions * 100)
+
+            params = {
+                 'red_ml_used': max_red_potions * 100, 
+                 'green_ml_used': max_green_potions * 100,
+                 'blue_ml_used': max_blue_potions * 100
+            }
+
+            connection.execute(update_liquid_query, params)
 
             # The transaction is automatically committed here if no error occurs.
             # If an exception is raised, a rollback happens automatically as well.

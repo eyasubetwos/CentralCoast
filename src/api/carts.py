@@ -30,7 +30,12 @@ def search_orders(customer_name: str = None, item_sku: str = None, cart_id: int 
             AND (:item_sku IS NULL OR ci.items_sku = :item_sku)
             AND (:cart_id IS NULL OR ci.cart_id = :cart_id)
         """)
-        results = connection.execute(query, customer_name=f"%{customer_name}%" if customer_name else None, item_sku=item_sku, cart_id=cart_id).fetchall()
+        params = {
+            'customer_name': f"%{customer_name}%" if customer_name else None,
+            'item_sku': item_sku,
+            'cart_id': cart_id
+        }
+        results = connection.execute(query, params).fetchall()
 
         formatted_results = [{
             "line_item_id": result[0],

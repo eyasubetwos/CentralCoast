@@ -19,18 +19,16 @@ class CapacityPurchase(BaseModel):
 @router.get("/audit")
 def get_inventory_audit():
     with db.engine.begin() as connection:
-        inventory_query = sqlalchemy.text("""
-            SELECT num_red_potions, num_green_potions, num_blue_potions, num_ml, gold
-            FROM global_inventory
-        """)
+        inventory_query = sqlalchemy.text(
+            "SELECT num_red_potions, num_green_potions, num_blue_potions, num_ml, gold FROM global_inventory"
+        )
         inventory_result = connection.execute(inventory_query).first()
         if not inventory_result:
             raise HTTPException(status_code=404, detail="Inventory data not found.")
 
-        capacity_query = sqlalchemy.text("""
-            SELECT red_potion_capacity, green_potion_capacity, blue_potion_capacity, ml_capacity
-            FROM capacity_inventory
-        """)
+        capacity_query = sqlalchemy.text(
+            "SELECT red_potion_capacity, green_potion_capacity, blue_potion_capacity, ml_capacity FROM capacity_inventory"
+        )
         capacity_result = connection.execute(capacity_query).first()
         if not capacity_result:
             raise HTTPException(status_code=404, detail="Capacity data not found.")
@@ -85,7 +83,7 @@ def deliver_capacity_plan(order_id: int, capacity_purchase: CapacityPurchase):
         connection.execute(sqlalchemy.text("""
             UPDATE global_inventory SET gold = gold - :cost
         """), cost=total_cost)
-
+        
         update_query = sqlalchemy.text("""
             UPDATE capacity_inventory
             SET red_potion_capacity = red_potion_capacity + :red_potion_capacity,

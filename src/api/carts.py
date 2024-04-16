@@ -12,7 +12,7 @@ router = APIRouter(
 
 class CartItem(BaseModel):
     quantity: int
-    item_sku: str
+    item_sku: str  # SKU must correspond to specific potion types e.g., 'GREEN_POTION', 'RED_POTION', 'BLUE_POTION'
 
 class CartCheckout(BaseModel):
     payment: str
@@ -69,27 +69,38 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
 
         total_cost = 0
 
-        # Check inventory and calculate total cost for all potion types
         for item in items:
+            # Fetch the current inventory based on SKU
             inventory_query = sqlalchemy.text("""
-                SELECT num_green_potions, num_red_potions, num_blue_potions, price 
+                SELECT price, num_green_potions, num_red_potions, num_blue_potions
                 FROM global_inventory
-                WHERE item_sku = :item_sku
+                WHERE id = 1  # Assuming a single global inventory record
             """)
-            inventory_item = connection.execute(inventory_query, item_sku=item.item_sku).first()
+            inventory_item = connection.execute(inventory_query).first()
 
-            if not inventory_item or inventory_item[0] < item.quantity:
+            if not inventory_item:
+                raise HTTPException(status_code=400, detail=f"Item not found: {item.item_sku}")
+
+            potion_count = {
+                'GREEN_POTION': inventory_item.num_green_potions,
+                'RED_POTION': inventory_item.num_red_potions,
+                'BLUE_POTION': inventory_item.num_blue_potions
+            }
+
+            available_quantity = potion_count.get(item.item_sku, 0)
+
+            if available_quantity < item.quantity:
                 raise HTTPException(status_code=400, detail=f"Insufficient stock for {item.item_sku}")
 
             total_cost += inventory_item.price * item.quantity
 
-            # Deduct the sold quantity from the inventory for the specific potion type
-            update_inventory_query = sqlalchemy.text("""
-                UPDATE global_inventory 
-                SET num_green_potions = num_green_potions - :quantity
-                WHERE item_sku = :item_sku AND num_green_potions >= :quantity
+            # Update the inventory
+            update_inventory_query = sqlalchemy.text(f"""
+                UPDATE global_inventory
+                SET {item.item_sku.lower()} = {item.item_sku.lower()} - :quantity
+                WHERE id = 1
             """)
-            connection.execute(update_inventory_query, quantity=item.quantity, item_sku=item.item_sku)
+            connection.execute(update_inventory_query, quantity=item.quantity)
 
         # Update the shop's gold
         update_gold_query = sqlalchemy.text("""

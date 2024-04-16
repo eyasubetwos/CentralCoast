@@ -11,72 +11,65 @@ router = APIRouter(
 )
 
 class Barrel(BaseModel):
-    sku: str
+    sku: str  # This should match specific potion types e.g., 'RED_POTION', 'GREEN_POTION', 'BLUE_POTION'
     ml_per_barrel: int
-    potion_type: list[int]  # Expects a list with 4 integers representing the potion color mix
     price: int
     quantity: int
 
 @router.post("/deliver/{order_id}")
 def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
     with db.engine.begin() as connection:
-        # Aggregate total cost and update ml for each potion color
-        total_cost = 0
-        ml_update = {'red': 0, 'green': 0, 'blue': 0}
-        
-        # Calculate total cost and ml to be updated
-        for barrel in barrels_delivered:
-            total_cost += barrel.price * barrel.quantity
-            potion_color_mix = barrel.potion_type  # Assuming [red%, green%, blue%, _]
-            ml_update['red'] += potion_color_mix[0] / 100 * barrel.ml_per_barrel * barrel.quantity
-            ml_update['green'] += potion_color_mix[1] / 100 * barrel.ml_per_barrel * barrel.quantity
-            ml_update['blue'] += potion_color_mix[2] / 100 * barrel.ml_per_barrel * barrel.quantity
-
-        # Check gold availability
+        total_cost = sum(barrel.price * barrel.quantity for barrel in barrels_delivered)
         current_gold = connection.execute(sqlalchemy.text("SELECT gold FROM global_inventory")).scalar()
+
         if current_gold < total_cost:
-            raise HTTPException(status_code=400, detail="Not enough gold for barrel purchase.")
+            raise HTTPException(status_code=400, detail="Not enough gold to complete the transaction.")
 
-        # Update the inventory with new ml and deduct cost
-        update_query = sqlalchemy.text("""
-            UPDATE global_inventory
-            SET num_red_ml = num_red_ml + :red_ml,
-                num_green_ml = num_green_ml + :green_ml,
-                num_blue_ml = num_blue_ml + :blue_ml,
-                gold = gold - :total_cost
-        """)
-        connection.execute(update_query, red_ml=ml_update['red'], green_ml=ml_update['green'], blue_ml=ml_update['blue'], total_cost=total_cost)
+        for barrel in barrels_delivered:
+            potion_type_field = f'num_{barrel.sku.lower()}_ml'  # Constructs field name dynamically based on SKU
+            update_ml = barrel.ml_per_barrel * barrel.quantity
+            update_query = sqlalchemy.text(f"""
+                UPDATE global_inventory
+                SET {potion_type_field} = {potion_type_field} + :update_ml,
+                    gold = gold - :spent_gold
+            """)
+            connection.execute(update_query, update_ml=update_ml, spent_gold=barrel.price * barrel.quantity)
 
-        return {"status": "Barrels delivered and inventory updated for order_id " + str(order_id)}
+        return {"status": f"Barrels delivered and inventory updated for order_id {order_id}"}
 
 @router.post("/plan")
 def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
     with db.engine.begin() as connection:
-        # Get the current ml for each potion color from the inventory
-        inventory_query = sqlalchemy.text("""
-            SELECT num_red_ml, num_green_ml, num_blue_ml FROM global_inventory
-        """)
+        # Get the current ml for each potion type from the inventory
+        inventory_query = sqlalchemy.text("SELECT num_red_ml, num_green_ml, num_blue_ml FROM global_inventory")
         current_ml = connection.execute(inventory_query).first()
-        num_red_ml, num_green_ml, num_blue_ml = current_ml if current_ml else (0, 0, 0)
 
+    if not current_ml:
+        raise HTTPException(status_code=404, detail="Inventory data not found.")
+
+    num_red_ml, num_green_ml, num_blue_ml = current_ml
     purchase_plan = []
-    # Thresholds for each potion color in ml
-    potion_thresholds = {'red': 500, 'green': 500, 'blue': 500}
 
-    # Check if any potion color is below its threshold and needs replenishing
+    # Define the purchase thresholds for each potion type
+    thresholds = {
+        'RED_POTION': 500,
+        'GREEN_POTION': 500,
+        'BLUE_POTION': 500
+    }
+
+    # Determine purchase needs based on current inventory and thresholds
     for barrel in wholesale_catalog:
-        if barrel.potion_type[0] > 0 and num_red_ml < potion_thresholds['red']:
-            purchase_plan.append({"sku": barrel.sku, "quantity": 1})
-            potion_thresholds['red'] -= barrel.ml_per_barrel  # Adjust threshold
-        elif barrel.potion_type[1] > 0 and num_green_ml < potion_thresholds['green']:
-            purchase_plan.append({"sku": barrel.sku, "quantity": 1})
-            potion_thresholds['green'] -= barrel.ml_per_barrel  # Adjust threshold
-        elif barrel.potion_type[2] > 0 and num_blue_ml < potion_thresholds['blue']:
-            purchase_plan.append({"sku": barrel.sku, "quantity": 1})
-            potion_thresholds['blue'] -= barrel.ml_per_barrel  # Adjust threshold
+        potion_type = barrel.sku.upper()  # SKU must correspond to potion types like 'RED_POTION'
+        if potion_type not in thresholds:
+            continue  # Skip if the barrel's SKU does not correspond to a known potion type
 
-        # If all thresholds are met or exceeded, stop purchasing
-        if all(ml >= 0 for ml in potion_thresholds.values()):
-            break
+        potion_ml_field = f'num_{potion_type.lower()}_ml'
+        current_potion_ml = getattr(current_ml, potion_ml_field, 0)  # Get the current ml for the potion type dynamically
+
+        # Check if additional ml is needed for this potion type
+        if current_potion_ml < thresholds[potion_type]:
+            purchase_plan.append({"sku": barrel.sku, "quantity": 1})
+            # Assume each barrel replenishes a standard quantity, e.g., one barrel per purchase until threshold is met
+            break  # Optional: Remove break if multiple barrels should be purchased at once
 
     return purchase_plan

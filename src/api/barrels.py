@@ -33,10 +33,9 @@ def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
                 SET {potion_type_field} = {potion_type_field} + :update_ml,
                     gold = gold - :spent_gold
             """)
-            connection.execute(update_query, update_ml=update_ml, spent_gold=barrel.price * barrel.quantity)
+            connection.execute(update_query, {'update_ml': update_ml, 'spent_gold': barrel.price * barrel.quantity})
 
         return {"status": f"Barrels delivered and inventory updated for order_id {order_id}"}
-
 @router.post("/plan")
 def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
     with db.engine.begin() as connection:

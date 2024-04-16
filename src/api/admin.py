@@ -33,8 +33,8 @@ def reset():
             # Reset capacity inventory to its initial state
             connection.execute(sqlalchemy.text("""
                 UPDATE capacity_inventory SET
-                potion_capacity = 50,  # Assuming initial capacity
-                ml_capacity = 10000    # Assuming initial capacity
+                potion_capacity = 50,  -- Assuming initial capacity
+                ml_capacity = 10000    -- Assuming initial capacity
             """))
 
             # Clear any customer visit logs

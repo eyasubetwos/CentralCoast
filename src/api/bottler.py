@@ -27,7 +27,14 @@ def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int
                     num_blue_potions = num_blue_potions + :blue
                 WHERE id = 1
             """)
-            connection.execute(update_query, red=potion.red_potion, green=potion.green_potion, blue=potion.blue_potion)
+            connection.execute(
+                update_query, 
+                {
+                    'red': potion.red_potion, 
+                    'green': potion.green_potion, 
+                    'blue': potion.blue_potion
+                }
+            )
 
     return {"status": f"Potions delivered and inventory updated for order_id {order_id}."}
 
@@ -58,10 +65,15 @@ def get_bottle_plan():
                     num_blue_ml = num_blue_ml - :blue_ml_used
                 WHERE id = 1
             """)
-            connection.execute(update_liquid_query, 
-                               red_ml_used=max_red_potions * 100, 
-                               green_ml_used=max_green_potions * 100,
-                               blue_ml_used=max_blue_potions * 100)
+
+            connection.execute(
+                               update_liquid_query, 
+                               {
+                                  'red_ml_used': max_red_potions * 100, 
+                                  'green_ml_used': max_green_potions * 100,
+                                  'blue_ml_used': max_blue_potions * 100
+                               }
+                              )
 
             transaction.commit()  # Commit changes to ensure data consistency
 

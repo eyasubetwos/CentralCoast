@@ -84,7 +84,7 @@ def deliver_capacity_plan(order_id: int, capacity_purchase: CapacityPurchase):
 
         connection.execute(sqlalchemy.text("""
             UPDATE global_inventory SET gold = gold - :cost
-        """), {cost=total_cost})
+        """), {'cost': total_cost})
         
         update_query = sqlalchemy.text("""
             UPDATE capacity_inventory

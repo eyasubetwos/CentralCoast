@@ -30,12 +30,17 @@ def reset():
                 gold = 100
             """))
 
+
             # Reset capacity inventory to its initial state
             connection.execute(sqlalchemy.text("""
                 UPDATE capacity_inventory SET
-                potion_capacity = 50,  -- Assuming initial capacity
-                ml_capacity = 10000    -- Assuming initial capacity
+                green_potion_capacity = 50,  -- Assuming initial capacity for green potions
+                blue_potion_capacity = 50,   -- Assuming initial capacity for blue potions
+                red_potion_capacity = 50,    -- Assuming initial capacity for red potions
+                ml_capacity = 10000          -- Assuming initial total capacity for ml
+                WHERE id = 1  -- Assuming you are updating the first row
             """))
+
 
             # Clear any customer visit logs
             connection.execute(sqlalchemy.text("DELETE FROM customer_visits"))

@@ -3,6 +3,7 @@ import sqlalchemy
 from src import database as db
 from src.api import auth
 from pydantic import BaseModel
+from typing import Optional
 
 router = APIRouter(
     prefix="/inventory",
@@ -11,10 +12,10 @@ router = APIRouter(
 )
 
 class CapacityPurchase(BaseModel):
-    red_potion_capacity: int
-    green_potion_capacity: int
-    blue_potion_capacity: int
-    ml_capacity: int
+    red_potion_capacity: Optional[int] = None
+    green_potion_capacity: Optional[int] = None
+    blue_potion_capacity: Optional[int] = None
+    ml_capacity: Optional[int] = None
 
 @router.get("/audit")
 def get_inventory_audit():
@@ -49,23 +50,48 @@ def get_inventory_audit():
 
 @router.post("/plan")
 def update_inventory_capacity(capacity_purchase: CapacityPurchase):
-    if any([
-        capacity_purchase.red_potion_capacity < 0, 
-        capacity_purchase.green_potion_capacity < 0,
-        capacity_purchase.blue_potion_capacity < 0,
-        capacity_purchase.ml_capacity < 0
-    ]):
-        raise HTTPException(status_code=400, detail="Capacity values must be positive.")
+    # Validate that provided values are positive, if present
+    if any(
+        value is not None and value < 0
+        for value in capacity_purchase.dict().values()
+    ):
+        raise HTTPException(status_code=400, detail="Capacity values must be positive if provided.")
 
     with db.engine.begin() as connection:
+        # Fetch the current capacity to use as default values
+        current_capacity = connection.execute(
+            sqlalchemy.text(
+                "SELECT red_potion_capacity, green_potion_capacity, blue_potion_capacity, ml_capacity "
+                "FROM capacity_inventory WHERE id = 1"
+            )
+        ).first()
+
+        # Create a dictionary of current capacity
+        capacity_defaults = {
+            "red_potion_capacity": current_capacity.red_potion_capacity,
+            "green_potion_capacity": current_capacity.green_potion_capacity,
+            "blue_potion_capacity": current_capacity.blue_potion_capacity,
+            "ml_capacity": current_capacity.ml_capacity
+        }
+
+        # Overwrite defaults with any provided values
+        update_values = {
+            key: value if value is not None else capacity_defaults[key]
+            for key, value in capacity_purchase.dict().items()
+        }
+
+        # Build the update query using new values
         update_query = sqlalchemy.text("""
             UPDATE capacity_inventory
-            SET red_potion_capacity = red_potion_capacity + :red_potion_capacity,
-                green_potion_capacity = green_potion_capacity + :green_potion_capacity,
-                blue_potion_capacity = blue_potion_capacity + :blue_potion_capacity,
-                ml_capacity = ml_capacity + :ml_capacity
+            SET red_potion_capacity = :red_potion_capacity,
+                green_potion_capacity = :green_potion_capacity,
+                blue_potion_capacity = :blue_potion_capacity,
+                ml_capacity = :ml_capacity
+            WHERE id = 1
         """)
-        connection.execute(update_query, capacity_purchase.dict())
+
+        # Execute the update query
+        connection.execute(update_query, update_values)
 
         return {"status": "Inventory capacity updated successfully."}
 

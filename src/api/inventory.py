@@ -98,27 +98,48 @@ def update_inventory_capacity(capacity_purchase: CapacityPurchase):
 @router.post("/deliver/{order_id}")
 def deliver_capacity_plan(order_id: int, capacity_purchase: CapacityPurchase):
     with db.engine.begin() as connection:
-        total_cost = (capacity_purchase.red_potion_capacity + 
-                      capacity_purchase.green_potion_capacity + 
-                      capacity_purchase.blue_potion_capacity +
-                      capacity_purchase.ml_capacity) * 1000  # Example cost calculation
-        gold_query = sqlalchemy.text("SELECT gold FROM global_inventory")
-        gold = connection.execute(gold_query).scalar()
+        # Fetch the current capacity to use as default values
+        current_capacity = connection.execute(
+            sqlalchemy.text(
+                "SELECT red_potion_capacity, green_potion_capacity, blue_potion_capacity, ml_capacity, gold "
+                "FROM capacity_inventory JOIN global_inventory ON capacity_inventory.id = global_inventory.id "
+                "WHERE capacity_inventory.id = 1"
+            )
+        ).first()
 
-        if gold < total_cost:
+        # Set the default cost multiplier
+        cost_multiplier = 1000  # Example cost calculation
+
+        # Calculate the total cost using either the provided values or the default ones
+        total_cost = sum(
+            (getattr(capacity_purchase, key) if getattr(capacity_purchase, key) is not None else getattr(current_capacity, key))
+            * cost_multiplier for key in ['red_potion_capacity', 'green_potion_capacity', 'blue_potion_capacity', 'ml_capacity']
+        )
+
+        if current_capacity.gold < total_cost:
             raise HTTPException(status_code=400, detail="Insufficient gold for capacity expansion.")
 
-        connection.execute(sqlalchemy.text("""
-            UPDATE global_inventory SET gold = gold - :cost
-        """), {'cost': total_cost})
+        # Deduct the total cost from the gold
+        connection.execute(
+            sqlalchemy.text("UPDATE global_inventory SET gold = gold - :cost"),
+            {'cost': total_cost}
+        )
         
+        # Prepare the new values for updating capacity, defaulting to the current capacity if not provided
+        update_values = {
+            key: getattr(capacity_purchase, key) if getattr(capacity_purchase, key) is not None else getattr(current_capacity, key)
+            for key in ['red_potion_capacity', 'green_potion_capacity', 'blue_potion_capacity', 'ml_capacity']
+        }
+
+        # Update the capacity
         update_query = sqlalchemy.text("""
             UPDATE capacity_inventory
             SET red_potion_capacity = red_potion_capacity + :red_potion_capacity,
                 green_potion_capacity = green_potion_capacity + :green_potion_capacity,
                 blue_potion_capacity = blue_potion_capacity + :blue_potion_capacity,
                 ml_capacity = ml_capacity + :ml_capacity
+            WHERE id = 1
         """)
-        connection.execute(update_query, capacity_purchase.dict())
+        connection.execute(update_query, update_values)
 
         return {"status": f"Capacity delivered and updated successfully for order_id {order_id}."}

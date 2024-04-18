@@ -25,7 +25,7 @@ def get_inventory():
             raise HTTPException(status_code=404, detail="Inventory data not found.")
 
         capacity_query = sqlalchemy.text(
-            "SELECT red_potion_capacity, green_potion_capacity, blue_potion_capacity, ml_capacity FROM capacity_inventory"
+            "SELECT potion_capacity, ml_capacity FROM capacity_inventory"
         )
         capacity_result = connection.execute(capacity_query).first()
         if not capacity_result:

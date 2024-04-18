@@ -39,7 +39,7 @@ def get_inventory():
             "ml_red_in_barrels": inventory_result.num_red_ml,
             "ml_blue_in_barrels": inventory_result.num_blue_ml,
             "gold": inventory_result.gold,
-            "potion_capacity": capacity_result.red_potion_capacity,
+            "potion_capacity": capacity_result.potion_capacity,
             "ml_capacity": capacity_result.ml_capacity
         }
 

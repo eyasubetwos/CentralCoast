@@ -80,11 +80,11 @@ def deliver_capacity_plan(capacity_purchase: CapacityPurchase, order_id: int):
     """
     # Assume 1 unit of potion capacity is equivalent to 50 potions, and each potion can hold 200 ml
     # Thus, 1 unit of ml capacity is 50 * 200 = 10000 ml
-    potion_capacity_increase = capacity_purchase.potion_capacity * 50
-    ml_capacity_increase = capacity_purchase.ml_capacity * 200 * 50  # Each potion holds 200 ml
+    potion_capacity_increase = capacity_purchase.potion_capacity
+    ml_capacity_increase = capacity_purchase.ml_capacity  # Each potion holds 200 ml
     cost_per_unit = 1000  # Assume each unit costs 1000 gold
 
-    total_cost = cost_per_unit * (((capacity_purchase.potion_capacity * 200) + capacity_purchase.ml_capacity) // 20000)
+    total_cost = cost_per_unit * (capacity_purchase.ml_capacity / 10000)
 
     with db.engine.begin() as connection:
         # Check if there's enough gold for the purchase

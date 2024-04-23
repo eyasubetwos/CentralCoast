@@ -5,7 +5,7 @@ from src.api import auth
 from pydantic import BaseModel
 from sqlalchemy.exc import SQLAlchemyError
 import logging
-from sqlalchemy.exc import SQLAlchemyError
+
 
 router = APIRouter(
     prefix="/inventory",
@@ -21,46 +21,51 @@ class CapacityPurchase(BaseModel):
 def get_inventory():
     try:
         with db.engine.begin() as connection:
-            # Log the attempt to retrieve inventory data
-            logging.info("Retrieving inventory data from global_inventory.")
+            # Fetching global inventory
             inventory_query = sqlalchemy.text("SELECT * FROM global_inventory")
             inventory_result = connection.execute(inventory_query).first()
             if not inventory_result:
-                logging.error("No inventory data found in global_inventory.")
-                raise HTTPException(status_code=404, detail="Inventory data not found.")
+                raise HTTPException(status_code=404, detail="Global inventory data not found.")
 
-            inventory_data = {key: value for key, value in inventory_result.items()}
+            # Converting RowProxy to dictionary
+            global_inventory_data = {key: value for key, value in inventory_result.items()}
 
-            logging.info("Retrieving capacity data from capacity_inventory.")
+            # Fetching capacity inventory
             capacity_query = sqlalchemy.text("SELECT * FROM capacity_inventory")
             capacity_result = connection.execute(capacity_query).first()
             if not capacity_result:
-                logging.error("No capacity data found in capacity_inventory.")
-                raise HTTPException(status_code=404, detail="Capacity data not found.")
+                raise HTTPException(status_code=404, detail="Capacity inventory data not found.")
 
+            # Adding capacity data to the global inventory dictionary
             for key, value in capacity_result.items():
-                inventory_data[key] = value
+                global_inventory_data[key] = value
 
-            logging.info("Fetching all available potion mixes from potion_mixes.")
+            # Fetching potion mixes
             potion_mixes_query = sqlalchemy.text("SELECT * FROM potion_mixes")
             potion_mixes_result = connection.execute(potion_mixes_query).fetchall()
 
+            # Adding potion mixes to the global inventory dictionary under a new key
+            potion_mixes_data = []
             for potion_mix in potion_mixes_result:
-                inventory_data[potion_mix['sku']] = {
+                potion_mixes_data.append({
                     "name": potion_mix['name'],
-                    "quantity": potion_mix['inventory_quantity'],
+                    "sku": potion_mix['sku'],
                     "price": potion_mix['price'],
+                    "inventory_quantity": potion_mix['inventory_quantity'],
                     "potion_composition": potion_mix['potion_composition']
-                }
+                })
 
-            return inventory_data
+            # Structure the complete response
+            response = {
+                "global_inventory": global_inventory_data,
+                "potion_mixes": potion_mixes_data
+            }
+            return response
+
     except SQLAlchemyError as e:
-        logging.error(f"Database error: {e}")
-        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     except Exception as e:
-        logging.error(f"Unexpected error: {e}")
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
-
 
 @router.get("/plan")
 def get_capacity_plan():

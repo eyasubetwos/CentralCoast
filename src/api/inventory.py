@@ -66,6 +66,7 @@ def get_inventory():
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
+
 @router.get("/plan")
 def get_capacity_plan():
     """

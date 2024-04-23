@@ -21,41 +21,41 @@ class CapacityPurchase(BaseModel):
 def get_inventory():
     try:
         with db.engine.begin() as connection:
-            # Fetching global inventory
+            # Fetching global inventory data
             inventory_query = sqlalchemy.text("SELECT * FROM global_inventory")
             inventory_result = connection.execute(inventory_query).first()
             if not inventory_result:
                 raise HTTPException(status_code=404, detail="Global inventory data not found.")
 
-            # Converting RowProxy to dictionary
+            # Convert RowProxy to dictionary
             global_inventory_data = {key: value for key, value in inventory_result.items()}
 
-            # Fetching capacity inventory
+            # Fetching capacity inventory data
             capacity_query = sqlalchemy.text("SELECT * FROM capacity_inventory")
             capacity_result = connection.execute(capacity_query).first()
             if not capacity_result:
                 raise HTTPException(status_code=404, detail="Capacity inventory data not found.")
 
-            # Adding capacity data to the global inventory dictionary
+            # Merge global and capacity inventory data
             for key, value in capacity_result.items():
                 global_inventory_data[key] = value
 
-            # Fetching potion mixes
+            # Fetching potion mixes data
             potion_mixes_query = sqlalchemy.text("SELECT * FROM potion_mixes")
             potion_mixes_result = connection.execute(potion_mixes_query).fetchall()
 
-            # Adding potion mixes to the global inventory dictionary under a new key
-            potion_mixes_data = []
-            for potion_mix in potion_mixes_result:
-                potion_mixes_data.append({
-                    "name": potion_mix['name'],
-                    "sku": potion_mix['sku'],
-                    "price": potion_mix['price'],
-                    "inventory_quantity": potion_mix['inventory_quantity'],
-                    "potion_composition": potion_mix['potion_composition']
-                })
+            potion_mixes_data = [
+                {
+                    "name": mix['name'],
+                    "sku": mix['sku'],
+                    "price": mix['price'],
+                    "inventory_quantity": mix['inventory_quantity'],
+                    "potion_composition": mix['potion_composition']
+                }
+                for mix in potion_mixes_result
+            ]
 
-            # Structure the complete response
+            # Construct final response
             response = {
                 "global_inventory": global_inventory_data,
                 "potion_mixes": potion_mixes_data
@@ -66,7 +66,6 @@ def get_inventory():
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
-
 @router.get("/plan")
 def get_capacity_plan():
     """

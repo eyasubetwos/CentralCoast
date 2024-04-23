@@ -17,6 +17,7 @@ class CapacityPurchase(BaseModel):
 @router.get("/audit")
 def get_inventory():
     with db.engine.begin() as connection:
+        # Retrieve inventory data for all potion types from the global_inventory table
         inventory_query = sqlalchemy.text(
             "SELECT * FROM global_inventory"
         )
@@ -24,6 +25,7 @@ def get_inventory():
         if not inventory_result:
             raise HTTPException(status_code=404, detail="Inventory data not found.")
 
+        # Retrieve capacity data from the capacity_inventory table
         capacity_query = sqlalchemy.text(
             "SELECT * FROM capacity_inventory"
         )
@@ -31,7 +33,23 @@ def get_inventory():
         if not capacity_result:
             raise HTTPException(status_code=404, detail="Capacity data not found.")
 
-        return dict(inventory_result, **capacity_result)
+        # Fetch all available potion mixes from the potion_mixes table
+        potion_mixes_query = sqlalchemy.text(
+            "SELECT * FROM potion_mixes"
+        )
+        potion_mixes_result = connection.execute(potion_mixes_query).fetchall()
+
+        # Construct inventory dictionary dynamically based on potion mixes
+        inventory_data = dict(inventory_result)
+        for potion_mix in potion_mixes_result:
+            inventory_data[potion_mix.sku] = {
+                "name": potion_mix.name,
+                "quantity": potion_mix.inventory_quantity,
+                "price": potion_mix.price,
+                "potion_composition": potion_mix.potion_composition
+            }
+
+        return inventory_data
 
 @router.post("/plan")
 def get_capacity_plan():

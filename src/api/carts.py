@@ -23,12 +23,13 @@ def search_orders(customer_name: str = None, item_sku: str = None, cart_id: int 
     try:
         with db.engine.begin() as connection:
             query = sqlalchemy.text("""
-                SELECT ci.cart_items_id, ci.items_sku, cv.customer_name, ci.quantity, cv.visit_timestamp
+                SELECT ci.cart_items_id, ci.item_sku, cv.customer_name, ci.quantity, cv.visit_timestamp
                 FROM cart_items ci
                 JOIN carts c ON ci.cart_id = c.cart_id
                 JOIN customer_visits cv ON c.visit_id = cv.visit_id
+                JOIN potion_mixes pm ON ci.item_sku = pm.sku
                 WHERE (:customer_name IS NULL OR cv.customer_name ILIKE :customer_name) 
-                AND (:item_sku IS NULL OR ci.items_sku = :item_sku)
+                AND (:item_sku IS NULL OR ci.item_sku = :item_sku)
                 AND (:cart_id IS NULL OR ci.cart_id = :cart_id)
             """)
             params = {
@@ -61,13 +62,13 @@ def set_item_quantity(cart_id: int, cart_item: CartItem):
             if potion_mix:
                 # Insert or update the cart item in the cart_items table
                 update_query = sqlalchemy.text("""
-                    INSERT INTO cart_items (cart_id, items_sku, quantity) 
-                    VALUES (:cart_id, :items_sku, :quantity)
-                    ON CONFLICT (cart_id, items_sku) DO UPDATE SET quantity = :quantity
+                    INSERT INTO cart_items (cart_id, item_sku, quantity) 
+                    VALUES (:cart_id, :item_sku, :quantity)
+                    ON CONFLICT (cart_id, item_sku) DO UPDATE SET quantity = :quantity
                 """)
                 params = {
                     'cart_id': cart_id,
-                    'items_sku': cart_item.item_sku,
+                    'item_sku': cart_item.item_sku,
                     'quantity': cart_item.quantity
                 }
                 connection.execute(update_query, params)
@@ -87,7 +88,7 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
         with db.engine.begin() as connection:
             # Fetch all items in the cart
             items_query = sqlalchemy.text("""
-                SELECT items_sku, quantity FROM cart_items WHERE cart_id = :cart_id
+                SELECT item_sku, quantity FROM cart_items WHERE cart_id = :cart_id
             """)
             items = connection.execute(items_query, cart_id=cart_id).fetchall()
 
@@ -98,11 +99,11 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
 
             for item in items:
                 # Fetch the price of the item from the potion_mixes table
-                potion_mix = db.find_one_potion_mix(item.items_sku)
+                potion_mix = db.find_one_potion_mix(item.item_sku)
                 if potion_mix:
                     total_cost += potion_mix.price * item.quantity
                 else:
-                    raise HTTPException(status_code=400, detail=f"Item SKU {item.items_sku} not found.")
+                    raise HTTPException(status_code=400, detail=f"Item SKU {item.item_sku} not found.")
 
             # Update the shop's gold
             update_gold_query = sqlalchemy.text("""

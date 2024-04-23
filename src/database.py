@@ -1,6 +1,8 @@
 import os
 import dotenv
 from sqlalchemy import create_engine, MetaData, Table
+from sqlalchemy.orm import Session
+from . import models
 
 def database_connection_url():
     dotenv.load_dotenv()
@@ -16,12 +18,12 @@ potion_mixes = Table(
     autoload=True,  # Automatically load the table structure from the database
 )
 
-def find_one_potion_mix(sku):
+def find_one_potion_mix(potion_composition):
     """
-    Retrieve a potion mix by its SKU from the potion_mixes table.
+    Retrieve a potion mix by its composition from the potion_mixes table.
     """
     with engine.connect() as conn:
-        query = potion_mixes.select().where(potion_mixes.c.sku == sku)
+        query = potion_mixes.select().where(potion_mixes.c.potion_composition == potion_composition)
         return conn.execute(query).fetchone()
 
 def find_all_potion_mixes():

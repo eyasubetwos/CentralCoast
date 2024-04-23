@@ -19,34 +19,30 @@ def reset():
     """
     try:
         with db.engine.begin() as connection:
-            # Reset gold to initial state and clear potion inventory
-            connection.execute(sqlalchemy.text("""
-                UPDATE global_inventory SET
-                gold = 100
-            """))
-            connection.execute(sqlalchemy.text("""
-                DELETE FROM potion_mixes
-            """))
+            # Reset gold to initial state
+            connection.execute(sqlalchemy.text("UPDATE global_inventory SET gold = 100"))
 
-            # Optionally, insert initial potion mixes state if needed
-            # INSERT INTO potion_mixes (columns...) VALUES (values...)
+            # Clear all existing potion mixes
+            connection.execute(sqlalchemy.text("DELETE FROM potion_mixes"))
+
+            # Reset potion mixes to initial state from the database
+            initial_potion_mixes = [
+                {"name": row.name, "potion_composition": row.potion_composition, "sku": row.sku, "price": row.price, "inventory_quantity": row.inventory_quantity}
+                for row in connection.execute(sqlalchemy.text("SELECT name, potion_composition, sku, price, inventory_quantity FROM potion_mixes"))
+            ]
+            connection.execute(sqlalchemy.text("DELETE FROM potion_mixes"))  # Clear existing data
+            connection.execute(sqlalchemy.text("""
+                INSERT INTO potion_mixes (name, potion_composition, sku, price, inventory_quantity)
+                VALUES (:name, :potion_composition, :sku, :price, :inventory_quantity)
+            """), initial_potion_mixes)
 
             # Reset capacity inventory to its initial state
-            # Adjust if the capacity_inventory structure has changed
-            connection.execute(sqlalchemy.text("""
-                UPDATE capacity_inventory SET
-                potion_capacity = 50,  -- Assuming initial capacity for green potions
-                ml_capacity = 10000    -- Assuming initial total capacity for ml
-                WHERE id = 1
-            """))
+            connection.execute(sqlalchemy.text("UPDATE capacity_inventory SET potion_capacity = 50, ml_capacity = 10000 WHERE id = 1"))
 
             # Clear any customer visit logs and carts
             connection.execute(sqlalchemy.text("DELETE FROM customer_visits"))
             connection.execute(sqlalchemy.text("DELETE FROM carts"))
             connection.execute(sqlalchemy.text("DELETE FROM cart_items"))
-
-            # Reset audit logs if implemented
-            # connection.execute(sqlalchemy.text("DELETE FROM audit_logs"))
 
             logging.info("Game state has been reset successfully.")
         return {"status": "Game state reset successfully."}

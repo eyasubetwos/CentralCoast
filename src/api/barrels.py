@@ -26,25 +26,37 @@ def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
             raise HTTPException(status_code=400, detail="Not enough gold to complete the transaction.")
 
         for barrel in barrels_delivered:
-            potion_mix = connection.execute(sqlalchemy.text("SELECT id, inventory_level FROM potion_mixes WHERE sku = :sku"),
-                                            {'sku': barrel.sku}).first()
+            # Fetch potion information from the database based on SKU
+            potion_mix = connection.execute(
+                sqlalchemy.text("SELECT id, inventory_quantity FROM potion_mixes WHERE sku = :sku"),
+                {'sku': barrel.sku}
+            ).first()
+
             if potion_mix is None:
                 raise HTTPException(status_code=404, detail=f"Potion with SKU {barrel.sku} not found.")
             
-            new_inventory_level = potion_mix.inventory_level + (barrel.ml_per_barrel * barrel.quantity)
-            connection.execute(sqlalchemy.text("UPDATE potion_mixes SET inventory_level = :new_inventory_level WHERE id = :id"),
-                               {'new_inventory_level': new_inventory_level, 'id': potion_mix.id})
-            connection.execute(sqlalchemy.text("UPDATE global_inventory SET gold = gold - :spent_gold WHERE id = 1"),
-                               {'spent_gold': barrel.price * barrel.quantity})
+            # Update inventory level in potion_mixes table
+            new_inventory_quantity = potion_mix.inventory_quantity + (barrel.quantity)
+            connection.execute(
+                sqlalchemy.text("UPDATE potion_mixes SET inventory_quantity = :new_inventory_quantity WHERE id = :id"),
+                {'new_inventory_quantity': new_inventory_quantity, 'id': potion_mix.id}
+            )
+            
+            # Deduct the cost of barrels from the gold in global_inventory table
+            connection.execute(
+                sqlalchemy.text("UPDATE global_inventory SET gold = gold - :spent_gold WHERE id = 1"),
+                {'spent_gold': barrel.price * barrel.quantity}
+            )
 
         return {"status": f"Barrels delivered and inventory updated for order_id {order_id}"}
+
 
 @router.post("/plan")
 def get_wholesale_purchase_plan():
     with db.engine.begin() as connection:
-        # Fetch inventory, sales velocity, and capacity data
+        # Fetch potion information from potion_mixes and potion_capacity tables
         inventory_query = sqlalchemy.text("""
-            SELECT p.sku, p.inventory_quantity, p.sales_velocity, c.max_capacity
+            SELECT p.sku, p.inventory_quantity, p.price, c.max_capacity
             FROM potion_mixes p
             JOIN potion_capacity c ON p.sku = c.potion_sku
         """)
@@ -63,16 +75,9 @@ def get_wholesale_purchase_plan():
             if potion.inventory_quantity < restock_threshold:
                 # Basic restock amount based on the minimum restock level and the threshold
                 restock_amount = max(minimum_restock, restock_threshold - potion.inventory_quantity)
-
-                # Adjust restock amount based on sales velocity and capacity
-                if potion.sales_velocity > 1.5:  # Arbitrary velocity threshold for "high demand"
-                    restock_amount = int(restock_amount * potion.sales_velocity)
                     
-                # Conform to maximum capacity constraints
-                restock_amount = min(restock_amount, potion.max_capacity - potion.inventory_quantity)
-                
                 # Estimate cost for this restock and add to total
-                restock_cost = restock_amount * potion.price  # Assuming price field exists
+                restock_cost = restock_amount * potion.price
                 total_estimated_cost += restock_cost
                 
                 # Check if the estimated cost is within the budget

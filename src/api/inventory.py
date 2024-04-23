@@ -18,14 +18,14 @@ class CapacityPurchase(BaseModel):
     ml_capacity: int
 
 
+# Setup basic logging at the beginning of your file
 logging.basicConfig(level=logging.DEBUG)
 
 @router.get("/audit")
 def get_inventory():
     try:
         with db.engine.begin() as connection:
-            # Fetching global inventory data
-	    logging.debug("Fetching global inventory...")
+            logging.debug("Fetching global inventory...")
             inventory_query = sqlalchemy.text("SELECT * FROM global_inventory")
             inventory_result = connection.execute(inventory_query).first()
             logging.debug(f"Inventory Result: {inventory_result}")

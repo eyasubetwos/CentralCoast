@@ -28,18 +28,21 @@ def get_inventory():
             # Fetching potion mixes data dynamically
             potion_mixes_query = sqlalchemy.text("SELECT * FROM potion_mixes")
             potion_mixes_result = connection.execute(potion_mixes_query).fetchall()
+
+            # Log the result to verify
             logging.debug(f"Potion Mixes Result: {potion_mixes_result}")
+
             if not potion_mixes_result:
                 raise HTTPException(status_code=404, detail="No potion mixes found.")
 
-            # Correctly handle RowProxy objects by converting each to a dictionary
+            # Correctly handle tuples by converting each to a dictionary using indices
             potion_mixes_data = [
                 {
-                    "name": mix['name'],
-                    "sku": mix['sku'],
-                    "price": mix['price'],
-                    "inventory_quantity": mix['inventory_quantity'],
-                    "potion_composition": mix['potion_composition']
+                    "name": mix[1],  # Accessing by index, mix[1] is 'name'
+                    "sku": mix[3],   # mix[3] is 'sku'
+                    "price": mix[4],  # mix[4] is 'price'
+                    "inventory_quantity": mix[5],  # mix[5] is 'inventory_quantity'
+                    "potion_composition": mix[2]  # mix[2] is 'potion_composition' which is a JSONB
                 }
                 for mix in potion_mixes_result
             ]

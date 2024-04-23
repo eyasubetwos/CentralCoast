@@ -25,6 +25,13 @@ from sqlalchemy.exc import SQLAlchemyError
 def get_inventory():
     try:
         with db.engine.begin() as connection:
+            # Fetching global inventory, including gold
+            global_inventory_query = sqlalchemy.text("SELECT * FROM global_inventory")
+            global_inventory_result = connection.execute(global_inventory_query).first()
+            
+            if not global_inventory_result:
+                raise HTTPException(status_code=404, detail="Global inventory data not found.")
+
             # Fetching potion mixes data dynamically
             potion_mixes_query = sqlalchemy.text("SELECT * FROM potion_mixes")
             potion_mixes_result = connection.execute(potion_mixes_query).fetchall()
@@ -34,6 +41,17 @@ def get_inventory():
 
             if not potion_mixes_result:
                 raise HTTPException(status_code=404, detail="No potion mixes found.")
+
+ 	    # Building the response
+            global_inventory_data = {
+                "num_green_potions": global_inventory_result[1],
+                "num_red_potions": global_inventory_result[2],
+                "num_blue_potions": global_inventory_result[3],
+                "num_green_ml": global_inventory_result[4],
+                "num_red_ml": global_inventory_result[5],
+                "num_blue_ml": global_inventory_result[6],
+                "gold": global_inventory_result[7]  # This is the total gold available
+
 
             # Correctly handle tuples by converting each to a dictionary using indices
             potion_mixes_data = [
@@ -47,7 +65,10 @@ def get_inventory():
                 for mix in potion_mixes_result
             ]
 
-            return {"potion_mixes": potion_mixes_data}
+            return {
+                "global_inventory": global_inventory_data,
+                "potion_mixes": potion_mixes_data
+            }
 
     except SQLAlchemyError as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")

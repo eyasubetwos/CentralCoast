@@ -32,6 +32,13 @@ def get_inventory():
             if not global_inventory_result:
                 raise HTTPException(status_code=404, detail="Global inventory data not found.")
 
+            # Fetching capacity inventory data
+            capacity_inventory_query = sqlalchemy.text("SELECT * FROM capacity_inventory")
+            capacity_inventory_result = connection.execute(capacity_inventory_query).first()
+
+            if not capacity_inventory_result:
+                raise HTTPException(status_code=404, detail="Capacity inventory data not found.")
+
             # Fetching potion mixes data dynamically
             potion_mixes_query = sqlalchemy.text("SELECT * FROM potion_mixes")
             potion_mixes_result = connection.execute(potion_mixes_query).fetchall()
@@ -54,6 +61,12 @@ def get_inventory():
             }
 
 
+            capacity_inventory_data = {
+                "potion_capacity": capacity_inventory_result[1],
+                "ml_capacity": capacity_inventory_result[2],
+                "gold_cost_per_unit": capacity_inventory_result[3]
+            }
+
             # Correctly handle tuples by converting each to a dictionary using indices
             potion_mixes_data = [
                 {
@@ -68,6 +81,7 @@ def get_inventory():
 
             return {
                 "global_inventory": global_inventory_data,
+                "capacity_inventory": capacity_inventory_data,
                 "potion_mixes": potion_mixes_data
             }
 

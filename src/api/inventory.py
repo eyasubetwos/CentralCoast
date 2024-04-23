@@ -28,7 +28,7 @@ def get_inventory():
             # Fetching potion mixes data dynamically
             potion_mixes_query = sqlalchemy.text("SELECT * FROM potion_mixes")
             potion_mixes_result = connection.execute(potion_mixes_query).fetchall()
-
+            logging.debug(f"Potion Mixes Result: {potion_mixes_result}")
             if not potion_mixes_result:
                 raise HTTPException(status_code=404, detail="No potion mixes found.")
 

@@ -14,7 +14,7 @@ metadata = MetaData()
 potion_mixes = Table(
     "potion_mixes",
     metadata,
-    autoload=True,  # Automatically load the table structure from the database
+    autoload_with=engine,  # Add this line
 )
 
 def find_one_potion_mix(potion_composition):

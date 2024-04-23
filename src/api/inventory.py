@@ -32,18 +32,17 @@ def get_inventory():
             if not potion_mixes_result:
                 raise HTTPException(status_code=404, detail="No potion mixes found.")
 
-            # Ensuring correct handling of RowProxy objects
-            potion_mixes_data = []
-            for mix in potion_mixes_result:
-                # Convert each RowProxy to a dictionary
-                potion_dict = {column: mix[column] for column in mix.keys()}
-                potion_mixes_data.append({
-                    "name": potion_dict['name'],
-                    "sku": potion_dict['sku'],
-                    "price": potion_dict['price'],
-                    "inventory_quantity": potion_dict['inventory_quantity'],
-                    "potion_composition": potion_dict['potion_composition']
-                })
+            # Correctly handle RowProxy objects by converting each to a dictionary
+            potion_mixes_data = [
+                {
+                    "name": mix['name'],
+                    "sku": mix['sku'],
+                    "price": mix['price'],
+                    "inventory_quantity": mix['inventory_quantity'],
+                    "potion_composition": mix['potion_composition']
+                }
+                for mix in potion_mixes_result
+            ]
 
             return {"potion_mixes": potion_mixes_data}
 

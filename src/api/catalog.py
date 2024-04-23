@@ -6,57 +6,38 @@ router = APIRouter()
 
 @router.get("/catalog/", tags=["catalog"])
 def get_catalog():
-    with db.engine.begin() as connection:
-        # Retrieve the inventory details for all potion types from the inventory
-        inventory_query = sqlalchemy.text(
-            "SELECT num_green_potions, num_red_potions, num_blue_potions, gold FROM global_inventory"
-        )
-        result = connection.execute(inventory_query).first()
-        
-        if not result:
-            raise HTTPException(status_code=404, detail="Inventory data not found.")
+    try:
+        with db.engine.begin() as connection:
+            # Retrieve potion details for all available potion types from the potion_mixes table
+            potion_details_query = sqlalchemy.text(
+                "SELECT name, sku, price, inventory_quantity, red_percentage, green_percentage, blue_percentage, dark_percentage FROM potion_mixes"
+            )
+            results = connection.execute(potion_details_query).fetchall()
+            
+            if not results:
+                raise HTTPException(status_code=404, detail="Potion details not found.")
 
-        # Unpack all potion quantities and gold
-        num_green_potions, num_red_potions, num_blue_potions, gold = result
-        
-        # Initialize an empty catalog response
-        catalog_response = []
+            # Initialize an empty catalog response
+            catalog_response = []
 
-        # Define potion details for each potion type
-        potion_types = {
-            "GREEN_POTION": {
-                "name": "Green Potion",
-                "quantity": num_green_potions,
-                "price": 50,  # Example price
-                "potion_type": [0, 100, 0, 0],  # Potion composition
-                "sku": "GP-001"
-            },
-            "RED_POTION": {
-                "name": "Red Potion",
-                "quantity": num_red_potions,
-                "price": 75,  # Example price
-                "potion_type": [100, 0, 0, 0],  # Potion composition
-                "sku": "RP-001"
-            },
-            "BLUE_POTION": {
-                "name": "Blue Potion",
-                "quantity": num_blue_potions,
-                "price": 65,  # Example price
-                "potion_type": [0, 0, 100, 0],  # Potion composition
-                "sku": "BP-001"
-            }
-        }
+            # Add available potions to the catalog response
+            for result in results:
+                name, sku, price, inventory_quantity, red_percentage, green_percentage, blue_percentage, dark_percentage = result
 
-        # Add available potions to the catalog response
-        for sku, details in potion_types.items():
-            if details["quantity"] > 0:  # Add to catalog only if the potion is available
-                catalog_response.append({
-                    "sku": details["sku"],
-                    "name": details["name"],
-                    "quantity": details["quantity"],
-                    "price": details["price"],
-                    "potion_type": details["potion_type"]
-                })
-        
-        # Return the catalog response, which will be an empty list if no potions are available
-        return catalog_response
+                # Calculate the potion composition based on percentages
+                potion_type = [red_percentage, green_percentage, blue_percentage, dark_percentage]
+
+                # Add to catalog only if the potion is available in inventory
+                if inventory_quantity > 0:
+                    catalog_response.append({
+                        "sku": sku,
+                        "name": name,
+                        "quantity": inventory_quantity,
+                        "price": price,
+                        "potion_type": potion_type
+                    })
+
+            return catalog_response
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

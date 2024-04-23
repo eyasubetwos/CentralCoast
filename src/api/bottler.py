@@ -17,79 +17,43 @@ class PotionInventory(BaseModel):
 
 @router.post("/deliver/{order_id}")
 def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int):
-    with db.engine.begin() as connection:
-        # Process each potion delivery within a transaction
-        for potion in potions_delivered:
-            update_query = sqlalchemy.text("""
-                UPDATE global_inventory
-                SET num_red_potions = num_red_potions + :red,
-                    num_green_potions = num_green_potions + :green,
-                    num_blue_potions = num_blue_potions + :blue
-                WHERE id = 1
-            """)
-            connection.execute(
-                update_query, 
-                {
-                    'red': potion.red_potion, 
-                    'green': potion.green_potion, 
-                    'blue': potion.blue_potion
-                }
-            )
+    try:
+        with db.engine.begin() as connection:
+            # Process each potion delivery within a transaction
+            for potion in potions_delivered:
+                # Get the SKU of the potion based on its composition
+                sku = f"{potion.red_potion}_{potion.green_potion}_{potion.blue_potion}"
+                potion_mix = db.find_one_potion_mix(sku)
+                if potion_mix:
+                    # Update the inventory_quantity for the potion mix
+                    db.update_potion_mix(sku, {'inventory_quantity': sqlalchemy.literal_column('inventory_quantity') + 1})
+                else:
+                    raise HTTPException(status_code=404, detail=f"Potion mix with SKU {sku} not found.")
 
-    return {"status": f"Potions delivered and inventory updated for order_id {order_id}."}
+        return {"status": f"Potions delivered and inventory updated for order_id {order_id}."}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/plan")
 def get_bottle_plan():
-    with db.engine.begin() as connection:  # This starts a transaction context
-        try:
-            liquid_query = sqlalchemy.text("""
-                SELECT num_red_ml, num_green_ml, num_blue_ml
-                FROM global_inventory
-                WHERE id = 1
-            """)
-            liquid_result = connection.execute(liquid_query).first()
-
-            if not liquid_result:
-                raise HTTPException(status_code=404, detail="Liquid inventory not found.")
-
-            max_red_potions = liquid_result.num_red_ml // 100
-            max_green_potions = liquid_result.num_green_ml // 100
-            max_blue_potions = liquid_result.num_blue_ml // 100
-
-            update_liquid_query = sqlalchemy.text("""
-                UPDATE global_inventory 
-                SET num_red_ml = num_red_ml - :red_ml_used,
-                    num_green_ml = num_green_ml - :green_ml_used,
-                    num_blue_ml = num_blue_ml - :blue_ml_used
-                WHERE id = 1
-            """)
-
-            params = {
-                 'red_ml_used': max_red_potions * 100, 
-                 'green_ml_used': max_green_potions * 100,
-                 'blue_ml_used': max_blue_potions * 100
-            }
-
-            connection.execute(update_liquid_query, params)
-
-            # The transaction is automatically committed here if no error occurs.
-            # If an exception is raised, a rollback happens automatically as well.
+    try:
+        with db.engine.begin() as connection:
+            # Get all potion mixes from the database
+            potion_mixes = db.find_all_potion_mixes()
 
             bottling_plan = []
-            if max_red_potions > 0:
-                bottling_plan.append({"potion_type": [100, 0, 0, 0], "quantity": max_red_potions})
-            if max_green_potions > 0:
-                bottling_plan.append({"potion_type": [0, 100, 0, 0], "quantity": max_green_potions})
-            if max_blue_potions > 0:
-                bottling_plan.append({"potion_type": [0, 0, 100, 0], "quantity": max_blue_potions})
+            for mix in potion_mixes:
+                # Calculate the quantity of each potion type based on the inventory and maximum capacity
+                max_potions = min(mix.red_percentage, mix.green_percentage, mix.blue_percentage) * mix.inventory_quantity // 100
+                if max_potions > 0:
+                    # Append the bottling plan for each potion type
+                    bottling_plan.append({"potion_type": [mix.red_percentage, mix.green_percentage, mix.blue_percentage, mix.dark_percentage], "quantity": max_potions})
 
             return bottling_plan
 
-        except Exception as e:
-            # Since the 'with' context is managing the transaction, a manual rollback is not needed here.
-            # The context manager will automatically roll back the transaction if an exception occurs.
-            raise HTTPException(status_code=500, detail=str(e))
-
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     print(get_bottle_plan())

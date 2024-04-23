@@ -18,30 +18,20 @@ class CapacityPurchase(BaseModel):
 def get_inventory():
     with db.engine.begin() as connection:
         inventory_query = sqlalchemy.text(
-            "SELECT num_red_potions, num_green_potions, num_blue_potions,  num_green_ml, num_red_ml, num_blue_ml, gold FROM global_inventory"
+            "SELECT * FROM global_inventory"
         )
         inventory_result = connection.execute(inventory_query).first()
         if not inventory_result:
             raise HTTPException(status_code=404, detail="Inventory data not found.")
 
         capacity_query = sqlalchemy.text(
-            "SELECT potion_capacity, ml_capacity FROM capacity_inventory"
+            "SELECT * FROM capacity_inventory"
         )
         capacity_result = connection.execute(capacity_query).first()
         if not capacity_result:
             raise HTTPException(status_code=404, detail="Capacity data not found.")
 
-        return {
-            "number_of_red_potions": inventory_result.num_red_potions,
-            "number_of_green_potions": inventory_result.num_green_potions,
-            "number_of_blue_potions": inventory_result.num_blue_potions,
-            "ml_green_in_barrels": inventory_result.num_green_ml,
-            "ml_red_in_barrels": inventory_result.num_red_ml,
-            "ml_blue_in_barrels": inventory_result.num_blue_ml,
-            "gold": inventory_result.gold,
-            "potion_capacity": capacity_result.potion_capacity,
-            "ml_capacity": capacity_result.ml_capacity
-        }
+        return dict(inventory_result, **capacity_result)
 
 @router.post("/plan")
 def get_capacity_plan():

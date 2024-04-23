@@ -15,37 +15,38 @@ def reset():
     """
     Reset the game state. Gold goes to 100, all potions are removed from
     inventory, and all barrels are removed from inventory. Carts are all reset.
+    The potion mixes are reset to their initial state as defined in the potion_mixes table.
     """
     try:
         with db.engine.begin() as connection:
-            # Reset global inventory to initial state
+            # Reset gold to initial state and clear potion inventory
             connection.execute(sqlalchemy.text("""
                 UPDATE global_inventory SET
-                num_green_potions = 0,
-                num_green_ml = 0,
-                num_red_potions = 0,
-                num_red_ml = 0,
-                num_blue_potions = 0,
-                num_blue_ml = 0,
                 gold = 100
             """))
+            connection.execute(sqlalchemy.text("""
+                DELETE FROM potion_mixes
+            """))
 
+            # Optionally, insert initial potion mixes state if needed
+            # INSERT INTO potion_mixes (columns...) VALUES (values...)
 
             # Reset capacity inventory to its initial state
+            # Adjust if the capacity_inventory structure has changed
             connection.execute(sqlalchemy.text("""
                 UPDATE capacity_inventory SET
                 potion_capacity = 50,  -- Assuming initial capacity for green potions
-                ml_capacity = 10000          -- Assuming initial total capacity for ml
-                WHERE id = 1  -- Assuming you are updating the first row
+                ml_capacity = 10000    -- Assuming initial total capacity for ml
+                WHERE id = 1
             """))
 
-
-            # Clear any customer visit logs
+            # Clear any customer visit logs and carts
             connection.execute(sqlalchemy.text("DELETE FROM customer_visits"))
-
-            # Optionally, reset any other tables such as carts or cart items if they exist
             connection.execute(sqlalchemy.text("DELETE FROM carts"))
             connection.execute(sqlalchemy.text("DELETE FROM cart_items"))
+
+            # Reset audit logs if implemented
+            # connection.execute(sqlalchemy.text("DELETE FROM audit_logs"))
 
             logging.info("Game state has been reset successfully.")
         return {"status": "Game state reset successfully."}

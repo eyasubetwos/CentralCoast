@@ -26,22 +26,23 @@ def get_inventory():
             inventory_result = connection.execute(inventory_query).first()
             if not inventory_result:
                 raise HTTPException(status_code=404, detail="Global inventory data not found.")
-            # Directly using the returned RowProxy as a dictionary
-            global_inventory_data = dict(inventory_result)
+            # Properly converting RowProxy to dictionary
+            global_inventory_data = {key: value for key, value in inventory_result.items()}
 
             # Fetching capacity inventory data
             capacity_query = sqlalchemy.text("SELECT * FROM capacity_inventory")
             capacity_result = connection.execute(capacity_query).first()
             if not capacity_result:
                 raise HTTPException(status_code=404, detail="Capacity inventory data not found.")
-            # Directly using the returned RowProxy as a dictionary
-            capacity_inventory_data = dict(capacity_result)
+            # Properly converting RowProxy to dictionary
+            capacity_inventory_data = {key: value for key, value in capacity_result.items()}
 
             # Fetching potion mixes data
             potion_mixes_query = sqlalchemy.text("SELECT * FROM potion_mixes")
             potion_mixes_result = connection.execute(potion_mixes_query).fetchall()
+            # Properly converting each RowProxy to dictionary
             potion_mixes_data = [
-                dict(mix)  # Convert each RowProxy to dictionary
+                {key: value for key, value in mix.items()}  # Ensure each potion mix is converted correctly
                 for mix in potion_mixes_result
             ]
 

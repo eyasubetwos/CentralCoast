@@ -5,6 +5,7 @@ from src.api import auth
 from pydantic import BaseModel
 from sqlalchemy.exc import SQLAlchemyError
 import logging
+logging.basicConfig(level=logging.DEBUG)
 
 
 router = APIRouter(

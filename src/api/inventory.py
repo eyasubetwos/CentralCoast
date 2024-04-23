@@ -17,13 +17,18 @@ class CapacityPurchase(BaseModel):
     potion_capacity: int
     ml_capacity: int
 
+
+logging.basicConfig(level=logging.DEBUG)
+
 @router.get("/audit")
 def get_inventory():
     try:
         with db.engine.begin() as connection:
             # Fetching global inventory data
+	    logging.debug("Fetching global inventory...")
             inventory_query = sqlalchemy.text("SELECT * FROM global_inventory")
             inventory_result = connection.execute(inventory_query).first()
+            logging.debug(f"Inventory Result: {inventory_result}")
             if not inventory_result:
                 raise HTTPException(status_code=404, detail="Global inventory data not found.")
             global_inventory_data = {key: value for key, value in inventory_result.items()}
@@ -54,6 +59,7 @@ def get_inventory():
     except SQLAlchemyError as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     except Exception as e:
+        logging.error(f"An error occurred: {str(e)}")
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
 
 @router.get("/plan")

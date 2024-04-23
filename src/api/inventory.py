@@ -17,49 +17,33 @@ class CapacityPurchase(BaseModel):
     potion_capacity: int
     ml_capacity: int
 
-
-# Setup basic logging at the beginning of your file
-logging.basicConfig(level=logging.DEBUG)
-
 @router.get("/audit")
 def get_inventory():
     try:
         with db.engine.begin() as connection:
-            logging.debug("Fetching global inventory...")
-            inventory_query = sqlalchemy.text("SELECT * FROM global_inventory")
-            inventory_result = connection.execute(inventory_query).first()
-            logging.debug(f"Inventory Result: {inventory_result}")
-            if not inventory_result:
-                raise HTTPException(status_code=404, detail="Global inventory data not found.")
-            global_inventory_data = {key: value for key, value in inventory_result.items()}
-
-            # Fetching capacity inventory data
-            capacity_query = sqlalchemy.text("SELECT * FROM capacity_inventory")
-            capacity_result = connection.execute(capacity_query).first()
-            if not capacity_result:
-                raise HTTPException(status_code=404, detail="Capacity inventory data not found.")
-            capacity_inventory_data = {key: value for key, value in capacity_result.items()}
-
-            # Fetching potion mixes data
+            # Fetching potion mixes data dynamically
             potion_mixes_query = sqlalchemy.text("SELECT * FROM potion_mixes")
             potion_mixes_result = connection.execute(potion_mixes_query).fetchall()
+
+            if not potion_mixes_result:
+                raise HTTPException(status_code=404, detail="No potion mixes found.")
+
             potion_mixes_data = [
-                {key: value for key, value in mix.items()}
+                {
+                    "name": mix['name'],
+                    "sku": mix['sku'],
+                    "price": mix['price'],
+                    "inventory_quantity": mix['inventory_quantity'],
+                    "potion_composition": mix['potion_composition']
+                }
                 for mix in potion_mixes_result
             ]
 
-            # Constructing the final response
-            response = {
-                "global_inventory": global_inventory_data,
-                "capacity_inventory": capacity_inventory_data,
-                "potion_mixes": potion_mixes_data
-            }
-            return response
+            return {"potion_mixes": potion_mixes_data}
 
     except SQLAlchemyError as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     except Exception as e:
-        logging.error(f"An error occurred: {str(e)}")
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
 
 @router.get("/plan")

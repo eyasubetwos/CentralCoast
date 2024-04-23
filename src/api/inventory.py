@@ -26,34 +26,20 @@ def get_inventory():
             inventory_result = connection.execute(inventory_query).first()
             if not inventory_result:
                 raise HTTPException(status_code=404, detail="Global inventory data not found.")
-            # Properly converting RowProxy to dictionary
-
-            logging.info(f"Inventory Result: {dict(inventory_result.items())}")
-            logging.info(f"Capacity Result: {dict(capacity_result.items())}")
-            for mix in potion_mixes_result:
-                logging.info(f"Potion Mix: {dict(mix.items())}")
-
             global_inventory_data = {key: value for key, value in inventory_result.items()}
-
-            logging.info(f"Inventory Result: {dict(inventory_result.items())}")
-            logging.info(f"Capacity Result: {dict(capacity_result.items())}")
-            for mix in potion_mixes_result:
-                logging.info(f"Potion Mix: {dict(mix.items())}")
 
             # Fetching capacity inventory data
             capacity_query = sqlalchemy.text("SELECT * FROM capacity_inventory")
             capacity_result = connection.execute(capacity_query).first()
             if not capacity_result:
                 raise HTTPException(status_code=404, detail="Capacity inventory data not found.")
-            # Properly converting RowProxy to dictionary
             capacity_inventory_data = {key: value for key, value in capacity_result.items()}
 
             # Fetching potion mixes data
             potion_mixes_query = sqlalchemy.text("SELECT * FROM potion_mixes")
             potion_mixes_result = connection.execute(potion_mixes_query).fetchall()
-            # Properly converting each RowProxy to dictionary
             potion_mixes_data = [
-                {key: value for key, value in mix.items()}  # Ensure each potion mix is converted correctly
+                {key: value for key, value in mix.items()}
                 for mix in potion_mixes_result
             ]
 
@@ -69,7 +55,6 @@ def get_inventory():
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
-
 
 @router.get("/plan")
 def get_capacity_plan():

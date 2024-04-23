@@ -51,6 +51,7 @@ def get_inventory():
                 "num_red_ml": global_inventory_result[5],
                 "num_blue_ml": global_inventory_result[6],
                 "gold": global_inventory_result[7]  # This is the total gold available
+            }
 
 
             # Correctly handle tuples by converting each to a dictionary using indices

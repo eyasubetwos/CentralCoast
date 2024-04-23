@@ -17,6 +17,9 @@ class CapacityPurchase(BaseModel):
     potion_capacity: int
     ml_capacity: int
 
+from fastapi import HTTPException
+from sqlalchemy.exc import SQLAlchemyError
+
 @router.get("/audit")
 def get_inventory():
     try:
@@ -28,6 +31,7 @@ def get_inventory():
             if not potion_mixes_result:
                 raise HTTPException(status_code=404, detail="No potion mixes found.")
 
+            # Ensure correct handling of RowProxy objects
             potion_mixes_data = [
                 {
                     "name": mix['name'],

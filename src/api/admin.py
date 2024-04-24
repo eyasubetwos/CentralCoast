@@ -19,6 +19,15 @@ def reset():
     """
     try:
         with db.engine.begin() as connection:
+            logging.info("Clearing cart items...")
+            connection.execute(sqlalchemy.text("DELETE FROM cart_items"))
+
+            logging.info("Clearing carts...")
+            connection.execute(sqlalchemy.text("DELETE FROM carts"))
+
+            logging.info("Clearing customer visits...")
+            connection.execute(sqlalchemy.text("DELETE FROM customer_visits"))
+
             logging.info("Resetting global inventory gold...")
             connection.execute(sqlalchemy.text("UPDATE global_inventory SET gold = 100"))
 
@@ -27,8 +36,10 @@ def reset():
 
             logging.info("Reinserting initial potion mixes...")
             initial_potion_mixes = [
-                {"name": row.name, "potion_composition": row.potion_composition, "sku": row.sku, "price": row.price, "inventory_quantity": row.inventory_quantity}
-                for row in connection.execute(sqlalchemy.text("SELECT name, potion_composition, sku, price, inventory_quantity FROM potion_mixes"))
+                {"name": 'Green Potion', "potion_composition": '{"green": 100, "red": 0, "blue": 0, "dark": 0}', "sku": 'GP-001', "price": 50.00, "inventory_quantity": 50},
+                {"name": 'Red Potion', "potion_composition": '{"red": 100, "blue": 0, "dark": 0, "green": 0}', "sku": 'RP-001', "price": 75.00, "inventory_quantity": 50},
+                {"name": 'Blue Potion', "potion_composition": '{"blue": 100, "red": 0, "dark": 0, "green": 0}', "sku": 'BP-001', "price": 65.00, "inventory_quantity": 50},
+                {"name": 'Purple Potion', "potion_composition": '{"green": 50, "red": 0, "blue": 50, "dark": 0}', "sku": 'PP-001', "price": 90.00, "inventory_quantity": 25}
             ]
             for potion in initial_potion_mixes:
                 connection.execute(sqlalchemy.text("""
@@ -38,11 +49,6 @@ def reset():
 
             logging.info("Resetting capacity inventory...")
             connection.execute(sqlalchemy.text("UPDATE capacity_inventory SET potion_capacity = 50, ml_capacity = 10000 WHERE id = 1"))
-
-            logging.info("Clearing customer visits and carts...")
-            connection.execute(sqlalchemy.text("DELETE FROM customer_visits"))
-            connection.execute(sqlalchemy.text("DELETE FROM carts"))
-            connection.execute(sqlalchemy.text("DELETE FROM cart_items"))
 
             logging.info("Game state has been reset successfully.")
         return {"status": "Game state reset successfully."}

@@ -13,6 +13,7 @@ router = APIRouter(
 class PotionInventory(BaseModel):
     potion_composition: dict = {}
 
+@router.post("/deliver/{order_id}")
 def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int):
     try:
         with db.engine.begin() as connection:

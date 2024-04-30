@@ -25,64 +25,30 @@ from sqlalchemy.exc import SQLAlchemyError
 def get_inventory():
     try:
         with db.engine.begin() as connection:
-            # Fetching global inventory, including gold
-            global_inventory_query = sqlalchemy.text("SELECT * FROM global_inventory")
-            global_inventory_result = connection.execute(global_inventory_query).first()
-            
-            if not global_inventory_result:
-                raise HTTPException(status_code=404, detail="Global inventory data not found.")
+            # Calculate current inventory totals from the ledger
+            ledger_query = sqlalchemy.text("""
+                SELECT item_type, SUM(change_amount) AS total
+                FROM inventory_ledger
+                GROUP BY item_type
+            """)
+            ledger_result = connection.execute(ledger_query).fetchall()
+            inventory_totals = {item['item_type']: item['total'] for item in ledger_result}
 
-            # Fetching capacity inventory data
-            capacity_inventory_query = sqlalchemy.text("SELECT * FROM capacity_inventory")
-            capacity_inventory_result = connection.execute(capacity_inventory_query).first()
-
-            if not capacity_inventory_result:
-                raise HTTPException(status_code=404, detail="Capacity inventory data not found.")
-
-            # Fetching potion mixes data dynamically
-            potion_mixes_query = sqlalchemy.text("SELECT * FROM potion_mixes")
-            potion_mixes_result = connection.execute(potion_mixes_query).fetchall()
-
-            # Log the result to verify
-            logging.debug(f"Potion Mixes Result: {potion_mixes_result}")
-
-            if not potion_mixes_result:
-                raise HTTPException(status_code=404, detail="No potion mixes found.")
-
- 	    # Building the response
-            global_inventory_data = {
-                "num_green_potions": global_inventory_result[1],
-                "num_red_potions": global_inventory_result[2],
-                "num_blue_potions": global_inventory_result[3],
-                "num_green_ml": global_inventory_result[4],
-                "num_red_ml": global_inventory_result[5],
-                "num_blue_ml": global_inventory_result[6],
-                "gold": global_inventory_result[7]  # This is the total gold available
-            }
-
-
-            capacity_inventory_data = {
-                "potion_capacity": capacity_inventory_result[1],
-                "ml_capacity": capacity_inventory_result[2],
-                "gold_cost_per_unit": capacity_inventory_result[3]
-            }
-
-            # Correctly handle tuples by converting each to a dictionary using indices
-            potion_mixes_data = [
+            # Get details for each potion type
+            potion_query = sqlalchemy.text("SELECT * FROM potion_mixes")
+            potion_result = connection.execute(potion_query).fetchall()
+            potions = [
                 {
-                    "name": mix[1],  # Accessing by index, mix[1] is 'name'
-                    "sku": mix[3],   # mix[3] is 'sku'
-                    "price": mix[4],  # mix[4] is 'price'
-                    "inventory_quantity": mix[5],  # mix[5] is 'inventory_quantity'
-                    "potion_composition": mix[2]  # mix[2] is 'potion_composition' which is a JSONB
-                }
-                for mix in potion_mixes_result
+                    "name": potion['name'],
+                    "sku": potion['sku'],
+                    "price": potion['price'],
+                    "inventory_quantity": inventory_totals.get(potion['sku'], 0),
+                    "potion_composition": potion['potion_composition']
+                } for potion in potion_result
             ]
 
             return {
-                "global_inventory": global_inventory_data,
-                "capacity_inventory": capacity_inventory_data,
-                "potion_mixes": potion_mixes_data
+                "inventory": potions
             }
 
     except SQLAlchemyError as e:

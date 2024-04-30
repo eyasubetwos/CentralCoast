@@ -10,7 +10,7 @@ def get_catalog():
         with db.engine.begin() as connection:
             # Retrieve potion details for all available potion types from the potion_mixes table
             potion_details_query = sqlalchemy.text(
-                "SELECT name, sku, price, inventory_quantity, potion_composition FROM potion_mixes"
+                "SELECT name, sku, price, potion_composition FROM potion_mixes"
             )
             results = connection.execute(potion_details_query).fetchall()
             
@@ -20,9 +20,17 @@ def get_catalog():
             # Initialize an empty catalog response
             catalog_response = []
 
-            # Add available potions to the catalog response
+            # Calculate inventory quantity for each potion from the ledger
             for result in results:
-                name, sku, price, inventory_quantity, potion_composition = result
+                name, sku, price, potion_composition = result
+
+                # Fetch the total quantity for the current potion SKU from the ledger
+                ledger_query = sqlalchemy.text(
+                    "SELECT SUM(change_amount) AS total_quantity FROM inventory_ledger WHERE item_id = :sku"
+                )
+                ledger_result = connection.execute(ledger_query, {'sku': sku}).scalar()
+
+                inventory_quantity = ledger_result if ledger_result is not None else 0
 
                 # Add to catalog only if the potion is available in inventory
                 if inventory_quantity > 0:

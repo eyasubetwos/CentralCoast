@@ -3,6 +3,7 @@ import sqlalchemy
 from src import database as db
 from pydantic import BaseModel
 from src.api import auth
+import datetime
 
 router = APIRouter(
     prefix="/carts",
@@ -52,75 +53,55 @@ def search_orders(customer_name: str = None, item_sku: str = None, cart_id: int 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# Add item to cart
 @router.post("/{cart_id}/items/")
 def set_item_quantity(cart_id: int, cart_item: CartItem):
     try:
         with db.engine.begin() as connection:
-            # Check if the item SKU exists in the potion mixes table
-            potion_mix = db.find_one_potion_mix(cart_item.item_sku)
-            if potion_mix:
-                # Insert or update the cart item in the cart_items table
-                update_query = sqlalchemy.text("""
-                    INSERT INTO cart_items (cart_id, item_sku, quantity) 
-                    VALUES (:cart_id, :item_sku, :quantity)
-                    ON CONFLICT (cart_id, item_sku) DO UPDATE SET quantity = :quantity
-                """)
-                params = {
-                    'cart_id': cart_id,
-                    'item_sku': cart_item.item_sku,
-                    'quantity': cart_item.quantity
-                }
-                connection.execute(update_query, params)
-            else:
-                raise HTTPException(status_code=404, detail=f"Item SKU {cart_item.item_sku} not found.")
-
+            update_query = sqlalchemy.text("""
+                INSERT INTO cart_items (cart_id, item_sku, quantity)
+                VALUES (:cart_id, :item_sku, :quantity)
+                ON CONFLICT (cart_id, item_sku) DO UPDATE SET quantity = EXCLUDED.quantity
+            """)
+            connection.execute(update_query, {'cart_id': cart_id, 'item_sku': cart_item.item_sku, 'quantity': cart_item.quantity})
             return {"status": "Cart updated successfully."}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
-# Checkout cart
 @router.post("/{cart_id}/checkout")
 def checkout(cart_id: int, cart_checkout: CartCheckout):
     try:
         with db.engine.begin() as connection:
-            # Fetch all items in the cart
             items_query = sqlalchemy.text("""
                 SELECT item_sku, quantity FROM cart_items WHERE cart_id = :cart_id
             """)
-            items = connection.execute(items_query, cart_id=cart_id).fetchall()
+            items = connection.execute(items_query, {'cart_id': cart_id}).fetchall()
 
             if not items:
                 raise HTTPException(status_code=404, detail="No items in cart.")
 
             total_cost = 0
-
             for item in items:
-                # Fetch the price of the item from the potion_mixes table
-                potion_mix = db.find_one_potion_mix(item.item_sku)
-                if potion_mix:
-                    total_cost += potion_mix.price * item.quantity
-                else:
-                    raise HTTPException(status_code=400, detail=f"Item SKU {item.item_sku} not found.")
+                price_query = sqlalchemy.text("SELECT price FROM potion_mixes WHERE sku = :sku")
+                price = connection.execute(price_query, {'sku': item['item_sku']}).scalar()
+                total_cost += price * item['quantity']
+                # Add ledger entry for each item sold
+                connection.execute(sqlalchemy.text("""
+                    INSERT INTO inventory_ledger (item_type, item_id, change_amount, description, date)
+                    VALUES ('potion', :item_id, -:quantity, 'sale', :date)
+                """), {'item_id': item['item_sku'], 'quantity': item['quantity'], 'date': datetime.datetime.now()})
 
-            # Update the shop's gold
-            update_gold_query = sqlalchemy.text("""
-                UPDATE global_inventory SET gold = gold + :total_cost
-            """)
-            connection.execute(update_gold_query, total_cost=total_cost)
+            # Update ledger for gold increase
+            connection.execute(sqlalchemy.text("""
+                INSERT INTO inventory_ledger (item_type, item_id, change_amount, description, date)
+                VALUES ('gold', 'N/A', :amount, 'sale income', :date)
+            """), {'amount': total_cost, 'date': datetime.datetime.now()})
 
             # Clear the cart after successful transaction
-            delete_cart_items_query = sqlalchemy.text("""
-                DELETE FROM cart_items WHERE cart_id = :cart_id
-            """)
-            connection.execute(delete_cart_items_query, cart_id=cart_id)
+            delete_cart_items_query = sqlalchemy.text("DELETE FROM cart_items WHERE cart_id = :cart_id")
+            connection.execute(delete_cart_items_query, {'cart_id': cart_id})
 
-            return {
-                "total_items_bought": len(items),
-                "total_gold_paid": total_cost
-            }
+            return {"total_items_bought": len(items), "total_gold_paid": total_cost}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

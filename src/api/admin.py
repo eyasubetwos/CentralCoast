@@ -3,6 +3,7 @@ import sqlalchemy
 from src import database as db
 from src.api import auth
 import logging
+import datetime
 
 router = APIRouter(
     prefix="/admin",
@@ -13,24 +14,24 @@ router = APIRouter(
 @router.post("/reset")
 def reset():
     """
-    Reset the game state. Gold goes to 100, all potions are removed from
-    inventory, and all barrels are removed from inventory. Carts are all reset.
-    The potion mixes are reset to their initial state as defined in the potion_mixes table.
+    Reset the game state. Gold goes to 100, all potion inventories are ledger-reset,
+    and all barrels and carts are reset. The potion mixes are reset to their initial state
+    as defined in the potion_mixes table.
     """
     try:
         with db.engine.begin() as connection:
-            logging.info("Clearing cart items...")
-            connection.execute(sqlalchemy.text("DELETE FROM cart_items"))
+            # Clearing all ledger entries
+            logging.info("Clearing inventory ledger...")
+            connection.execute(sqlalchemy.text("DELETE FROM inventory_ledger"))
 
-            logging.info("Clearing carts...")
-            connection.execute(sqlalchemy.text("DELETE FROM carts"))
+            # Resetting gold to initial state via ledger
+            logging.info("Resetting global inventory gold via ledger...")
+            connection.execute(sqlalchemy.text("""
+                INSERT INTO inventory_ledger (item_type, item_id, change_amount, description, date)
+                VALUES ('gold', 'N/A', 100, 'Reset gold to initial state', :date)
+            """), {'date': datetime.datetime.now()})
 
-            logging.info("Clearing customer visits...")
-            connection.execute(sqlalchemy.text("DELETE FROM customer_visits"))
-
-            logging.info("Resetting global inventory gold...")
-            connection.execute(sqlalchemy.text("UPDATE global_inventory SET gold = 100"))
-
+            # Clearing and resetting potion mixes
             logging.info("Clearing potion mixes...")
             connection.execute(sqlalchemy.text("DELETE FROM potion_mixes"))
 
@@ -47,8 +48,11 @@ def reset():
                     VALUES (:name, :potion_composition, :sku, :price, :inventory_quantity)
                 """), potion)
 
-            logging.info("Resetting capacity inventory...")
-            connection.execute(sqlalchemy.text("UPDATE capacity_inventory SET potion_capacity = 50, ml_capacity = 10000 WHERE id = 1"))
+            # Clearing any customer visit logs and carts
+            logging.info("Clearing customer visits and carts...")
+            connection.execute(sqlalchemy.text("DELETE FROM customer_visits"))
+            connection.execute(sqlalchemy.text("DELETE FROM carts"))
+            connection.execute(sqlalchemy.text("DELETE FROM cart_items"))
 
             logging.info("Game state has been reset successfully.")
         return {"status": "Game state reset successfully."}
@@ -58,3 +62,4 @@ def reset():
     except Exception as e:
         logging.error(f"Unexpected error during reset: {e}")
         raise HTTPException(status_code=500, detail=f"Unexpected error during reset: {e}")
+

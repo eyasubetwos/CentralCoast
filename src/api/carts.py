@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi_pagination import Page, paginate
 import sqlalchemy
 from src import database as db
 from pydantic import BaseModel
@@ -18,12 +19,32 @@ class CartItem(BaseModel):
 class CartCheckout(BaseModel):
     payment: str
 
-# Search for cart items
-@router.get("/search/", tags=["search"])
-def search_orders(customer_name: str = None, item_sku: str = None, cart_id: int = None):
+# Response model for pagination
+class OrderItem(BaseModel):
+    line_item_id: int
+    item_sku: str
+    customer_name: str
+    quantity: int
+    timestamp: str
+
+# Search for cart items with pagination
+@router.get("/search/", response_model=Page[OrderItem], tags=["search"])
+def search_orders(
+    customer_name: str = Query(None),
+    item_sku: str = Query(None),
+    cart_id: int = Query(None),
+    skip: int = Query(0, alias="offset"),
+    limit: int = Query(10, alias="limit"),
+    sort: str = Query("visit_timestamp", alias="sort")
+):
     try:
         with db.engine.begin() as connection:
-            query = sqlalchemy.text("""
+            # Validate sort parameter
+            valid_sort_fields = ['visit_timestamp', 'customer_name', 'item_sku', 'quantity']
+            if sort not in valid_sort_fields:
+                raise HTTPException(status_code=400, detail="Invalid sort field")
+
+            base_query = """
                 SELECT ci.cart_items_id, ci.item_sku, cv.customer_name, ci.quantity, cv.visit_timestamp
                 FROM cart_items ci
                 JOIN carts c ON ci.cart_id = c.cart_id
@@ -32,23 +53,27 @@ def search_orders(customer_name: str = None, item_sku: str = None, cart_id: int 
                 WHERE (:customer_name IS NULL OR cv.customer_name ILIKE :customer_name) 
                 AND (:item_sku IS NULL OR ci.item_sku = :item_sku)
                 AND (:cart_id IS NULL OR ci.cart_id = :cart_id)
-            """)
-            params = {
+            """
+            # Dynamic sorting
+            base_query += f" ORDER BY {sort} OFFSET :skip LIMIT :limit"
+
+            results = connection.execute(sqlalchemy.text(base_query), {
                 'customer_name': f"%{customer_name}%" if customer_name else None,
                 'item_sku': item_sku,
-                'cart_id': cart_id
-            }
-            results = connection.execute(query, params).fetchall()
+                'cart_id': cart_id,
+                'skip': skip,
+                'limit': limit
+            }).fetchall()
 
-            formatted_results = [{
-                "line_item_id": result[0],
-                "item_sku": result[1],
-                "customer_name": result[2],
-                "quantity": result[3],
-                "timestamp": result[4].isoformat(),
-            } for result in results]
+            formatted_results = [OrderItem(
+                line_item_id=result[0],
+                item_sku=result[1],
+                customer_name=result[2],
+                quantity=result[3],
+                timestamp=result[4].isoformat()
+            ) for result in results]
 
-            return formatted_results
+            return paginate(formatted_results)
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

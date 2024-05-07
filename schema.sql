@@ -50,6 +50,16 @@ CREATE TABLE cart_items (
     quantity INT NOT NULL CHECK (quantity >= 0)
 );
 
+CREATE TABLE inventory_ledger (
+    ledger_id SERIAL PRIMARY KEY,
+    date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    item_type VARCHAR(255) NOT NULL,
+    item_id VARCHAR(50),  -- This could be SKU for potions or a similar identifier for other items
+    change_amount INT NOT NULL,
+    current_total INT,
+    description TEXT
+);
+
 -- Add unique constraint for SKU
 ALTER TABLE potion_mixes
     ADD CONSTRAINT uq_sku UNIQUE (sku);

@@ -24,7 +24,7 @@ def reset():
             logging.info("Clearing inventory ledger...")
             connection.execute(sqlalchemy.text("DELETE FROM inventory_ledger"))
 
-            # Resetting global inventory gold via ledger
+            # Resetting global inventory via ledger
             logging.info("Resetting global inventory via ledger...")
             connection.execute(sqlalchemy.text("""
                 INSERT INTO inventory_ledger (item_type, item_id, change_amount, description, date)

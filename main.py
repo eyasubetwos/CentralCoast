@@ -1,5 +1,6 @@
 import os
 import uvicorn
+import src.scheduler  # Import the scheduler module
 
 if __name__ == "__main__":
     # Determine if running in a development environment
@@ -11,6 +12,9 @@ if __name__ == "__main__":
     else:
         # For production, set env_file to None
         env_file = None
+
+    # Start the scheduler
+    src.scheduler.start_scheduler()
 
     config = uvicorn.Config(
         "src.api.server:app", port=3000, log_level="info", reload=is_dev, env_file=env_file

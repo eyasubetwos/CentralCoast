@@ -31,6 +31,19 @@ def reset():
                 VALUES ('gold', 'N/A', 100 - COALESCE((SELECT SUM(change_amount) FROM inventory_ledger WHERE item_type = 'gold'), 0), 'Reset gold to initial state', :date)
             """), {'date': datetime.datetime.now()})
 
+            # Clear and reset global_inventory table
+            logging.info("Resetting global inventory values...")
+            connection.execute(sqlalchemy.text("""
+                UPDATE global_inventory SET
+                num_green_potions = 0,
+                num_red_potions = 0,
+                num_blue_potions = 0,
+                num_green_ml = 0,
+                num_red_ml = 0,
+                num_blue_ml = 0,
+                gold = 0
+            """))
+
             # Clearing and resetting potion mixes
             logging.info("Clearing potion mixes...")
             connection.execute(sqlalchemy.text("DELETE FROM potion_mixes"))

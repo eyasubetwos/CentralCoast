@@ -62,4 +62,3 @@ def reset():
     except Exception as e:
         logging.error(f"Unexpected error during reset: {e}")
         raise HTTPException(status_code=500, detail=f"Unexpected error during reset: {e}")
-

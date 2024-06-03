@@ -24,25 +24,19 @@ def reset():
             logging.info("Clearing inventory ledger...")
             connection.execute(sqlalchemy.text("DELETE FROM inventory_ledger"))
 
-            # Resetting gold to initial state via ledger
-            logging.info("Resetting global inventory gold via ledger...")
+            # Resetting global inventory gold via ledger
+            logging.info("Resetting global inventory via ledger...")
             connection.execute(sqlalchemy.text("""
                 INSERT INTO inventory_ledger (item_type, item_id, change_amount, description, date)
-                VALUES ('gold', 'N/A', 100 - COALESCE((SELECT SUM(change_amount) FROM inventory_ledger WHERE item_type = 'gold'), 0), 'Reset gold to initial state', :date)
+                VALUES 
+                    ('gold', 'N/A', 100, 'Reset gold to initial state', :date),
+                    ('potion', 'GP-001', 100, 'Initial green potion stock', :date),
+                    ('potion', 'RP-001', 100, 'Initial red potion stock', :date),
+                    ('potion', 'BP-001', 100, 'Initial blue potion stock', :date),
+                    ('ml', 'green', 50000, 'Initial green ml stock', :date),
+                    ('ml', 'red', 50000, 'Initial red ml stock', :date),
+                    ('ml', 'blue', 50000, 'Initial blue ml stock', :date)
             """), {'date': datetime.datetime.now()})
-
-            # Clear and reset global_inventory table
-            logging.info("Resetting global inventory values...")
-            connection.execute(sqlalchemy.text("""
-                UPDATE global_inventory SET
-                num_green_potions = 0,
-                num_red_potions = 0,
-                num_blue_potions = 0,
-                num_green_ml = 0,
-                num_red_ml = 0,
-                num_blue_ml = 0,
-                gold = 0
-            """))
 
             # Clearing and resetting potion mixes
             logging.info("Clearing potion mixes...")

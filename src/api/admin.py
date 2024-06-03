@@ -30,12 +30,12 @@ def reset():
                 INSERT INTO inventory_ledger (item_type, item_id, change_amount, description, date)
                 VALUES 
                     ('gold', 'N/A', 100, 'Reset gold to initial state', :date),
-                    ('potion', 'GP-001', 100, 'Initial green potion stock', :date),
-                    ('potion', 'RP-001', 100, 'Initial red potion stock', :date),
-                    ('potion', 'BP-001', 100, 'Initial blue potion stock', :date),
-                    ('ml', 'green', 50000, 'Initial green ml stock', :date),
-                    ('ml', 'red', 50000, 'Initial red ml stock', :date),
-                    ('ml', 'blue', 50000, 'Initial blue ml stock', :date)
+                    ('potion', 'GP-001', 0, 'Initial green potion stock', :date),
+                    ('potion', 'RP-001', 0, 'Initial red potion stock', :date),
+                    ('potion', 'BP-001', 0, 'Initial blue potion stock', :date),
+                    ('ml', 'green', 5000, 'Initial green ml stock', :date),
+                    ('ml', 'red', 5000, 'Initial red ml stock', :date),
+                    ('ml', 'blue', 5000, 'Initial blue ml stock', :date)
             """), {'date': datetime.datetime.now()})
 
             # Clearing and resetting potion mixes
@@ -44,10 +44,10 @@ def reset():
 
             logging.info("Reinserting initial potion mixes...")
             initial_potion_mixes = [
-                {"name": 'Green Potion', "potion_composition": '{"green": 100, "red": 0, "blue": 0, "dark": 0}', "sku": 'GP-001', "price": 25.00, "inventory_quantity": 50},
-                {"name": 'Red Potion', "potion_composition": '{"red": 100, "blue": 0, "dark": 0, "green": 0}', "sku": 'RP-001', "price": 25.00, "inventory_quantity": 50},
-                {"name": 'Blue Potion', "potion_composition": '{"blue": 100, "red": 0, "dark": 0, "green": 0}', "sku": 'BP-001', "price": 25.00, "inventory_quantity": 50},
-                {"name": 'Purple Potion', "potion_composition": '{"green": 50, "red": 0, "blue": 50, "dark": 0}', "sku": 'PP-001', "price": 25.00, "inventory_quantity": 25}
+                {"name": 'Green Potion', "potion_composition": '{"green": 100, "red": 0, "blue": 0, "dark": 0}', "sku": 'GP-001', "price": 25.00, "inventory_quantity": 0},
+                {"name": 'Red Potion', "potion_composition": '{"red": 100, "blue": 0, "dark": 0, "green": 0}', "sku": 'RP-001', "price": 25.00, "inventory_quantity": 0},
+                {"name": 'Blue Potion', "potion_composition": '{"blue": 100, "red": 0, "dark": 0, "green": 0}', "sku": 'BP-001', "price": 25.00, "inventory_quantity": 0},
+                {"name": 'Purple Potion', "potion_composition": '{"green": 50, "red": 0, "blue": 50, "dark": 0}', "sku": 'PP-001', "price": 25.00, "inventory_quantity": 0}
             ]
             for potion in initial_potion_mixes:
                 connection.execute(sqlalchemy.text("""

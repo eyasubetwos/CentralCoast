@@ -32,18 +32,18 @@ def get_inventory():
                 GROUP BY item_type
             """)
             ledger_result = connection.execute(ledger_query).fetchall()
-            inventory_totals = {item['item_type']: item['total'] for item in ledger_result}
+            inventory_totals = {item[0]: item[1] for item in ledger_result}
 
             # Get details for each potion type
-            potion_query = sqlalchemy.text("SELECT * FROM potion_mixes")
+            potion_query = sqlalchemy.text("SELECT name, sku, price, potion_composition FROM potion_mixes")
             potion_result = connection.execute(potion_query).fetchall()
             potions = [
                 {
-                    "name": potion['name'],
-                    "sku": potion['sku'],
-                    "price": potion['price'],
-                    "inventory_quantity": inventory_totals.get(potion['sku'], 0),
-                    "potion_composition": potion['potion_composition']
+                    "name": potion[0],
+                    "sku": potion[1],
+                    "price": potion[2],
+                    "inventory_quantity": inventory_totals.get(potion[1], 0),
+                    "potion_composition": potion[3]
                 } for potion in potion_result
             ]
 
@@ -55,6 +55,7 @@ def get_inventory():
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
+
 
 @router.get("/plan")
 def get_capacity_plan():

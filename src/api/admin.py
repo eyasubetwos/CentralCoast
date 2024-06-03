@@ -38,6 +38,19 @@ def reset():
                     ('ml', 'blue', 5000, 'Initial blue ml stock', :date)
             """), {'date': datetime.datetime.now()})
 
+            # Updating global inventory directly
+            logging.info("Updating global inventory...")
+            connection.execute(sqlalchemy.text("""
+                UPDATE global_inventory
+                SET gold = 100,
+                    num_green_potions = 0,
+                    num_red_potions = 0,
+                    num_blue_potions = 0,
+                    num_green_ml = 5000,
+                    num_red_ml = 5000,
+                    num_blue_ml = 5000
+            """))
+
             # Clearing and resetting potion mixes
             logging.info("Clearing potion mixes...")
             connection.execute(sqlalchemy.text("DELETE FROM potion_mixes"))

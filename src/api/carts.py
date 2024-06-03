@@ -140,10 +140,9 @@ def simulate_purchase():
                 if not visit_exists:
                     logging.info("Creating new customer visit with visit_id = 1")
                     connection.execute(sqlalchemy.text("""
-                        INSERT INTO customer_visits (customer_name, visit_timestamp)
-                        VALUES ('Test Customer', :visit_timestamp)
-                    """), {'visit_timestamp': datetime.datetime.now()})
-                    # No commit here; transaction managed by context
+                        INSERT INTO customer_visits (visit_id, customer_name, visit_timestamp)
+                        VALUES (:visit_id, 'Test Customer', :visit_timestamp)
+                    """), {'visit_id': visit_id, 'visit_timestamp': datetime.datetime.now()})
 
                 # Ensure cart_id exists
                 cart_id = 1
@@ -153,10 +152,9 @@ def simulate_purchase():
                 if not cart_exists:
                     logging.info("Creating new cart with cart_id = 1")
                     connection.execute(sqlalchemy.text("""
-                        INSERT INTO carts (visit_id, created_at)
-                        VALUES (:visit_id, :created_at)
-                    """), {'visit_id': visit_id, 'created_at': datetime.datetime.now()})
-                    # No commit here; transaction managed by context
+                        INSERT INTO carts (cart_id, visit_id, created_at)
+                        VALUES (:cart_id, :visit_id, :created_at)
+                    """), {'cart_id': cart_id, 'visit_id': visit_id, 'created_at': datetime.datetime.now()})
 
                 # Add item to cart
                 logging.info("Adding item to cart")

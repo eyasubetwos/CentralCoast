@@ -4,6 +4,7 @@ from src import database as db
 from pydantic import BaseModel
 from src.api import auth
 import datetime
+import logging
 
 router = APIRouter(
     prefix="/carts",
@@ -17,6 +18,9 @@ class CartItem(BaseModel):
 
 class CartCheckout(BaseModel):
     payment: str
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 
 # Search for cart items
 @router.get("/search/", tags=["search"])
@@ -51,6 +55,7 @@ def search_orders(customer_name: str = None, item_sku: str = None, cart_id: int 
             return formatted_results
 
     except Exception as e:
+        logging.error(f"Error searching orders: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/{cart_id}/items/")
@@ -63,9 +68,11 @@ def set_item_quantity(cart_id: int, cart_item: CartItem):
                 ON CONFLICT (cart_id, item_sku) DO UPDATE SET quantity = EXCLUDED.quantity
             """)
             connection.execute(update_query, {'cart_id': cart_id, 'item_sku': cart_item.item_sku, 'quantity': cart_item.quantity})
+            logging.info(f"Cart {cart_id} updated with item {cart_item.item_sku} quantity {cart_item.quantity}")
             return {"status": "Cart updated successfully."}
 
     except Exception as e:
+        logging.error(f"Error updating cart: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/{cart_id}/checkout")
@@ -78,6 +85,7 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
             items = connection.execute(items_query, {'cart_id': cart_id}).fetchall()
 
             if not items:
+                logging.info(f"No items in cart {cart_id} for checkout.")
                 raise HTTPException(status_code=404, detail="No items in cart.")
 
             total_cost = 0
@@ -85,13 +93,15 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
                 price_query = sqlalchemy.text("SELECT price FROM potion_mixes WHERE sku = :sku")
                 price = connection.execute(price_query, {'sku': item['item_sku']}).scalar()
                 total_cost += price * item['quantity']
+                logging.info(f"Item {item['item_sku']} quantity {item['quantity']} price {price}")
+
                 # Add ledger entry for each item sold
                 connection.execute(sqlalchemy.text("""
                     INSERT INTO inventory_ledger (item_type, item_id, change_amount, description, date)
                     VALUES ('potion', :item_id, -:quantity, 'sale', :date)
                 """), {'item_id': item['item_sku'], 'quantity': item['quantity'], 'date': datetime.datetime.now()})
 
-            print(f"Total cost calculated: {total_cost}")
+            logging.info(f"Total cost for cart {cart_id}: {total_cost}")
 
             # Update ledger for gold increase
             connection.execute(sqlalchemy.text("""
@@ -99,15 +109,16 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
                 VALUES ('gold', 'N/A', :amount, 'sale income', :date)
             """), {'amount': total_cost, 'date': datetime.datetime.now()})
 
-            print(f"Gold updated with total cost: {total_cost}")
+            logging.info(f"Gold updated with total cost: {total_cost}")
 
             # Clear the cart after successful transaction
             delete_cart_items_query = sqlalchemy.text("DELETE FROM cart_items WHERE cart_id = :cart_id")
             connection.execute(delete_cart_items_query, {'cart_id': cart_id})
 
-            print("Cart items deleted")
+            logging.info(f"Cart {cart_id} cleared after checkout.")
 
             return {"total_items_bought": len(items), "total_gold_paid": total_cost}
 
     except Exception as e:
+        logging.error(f"Error during checkout: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

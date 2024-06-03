@@ -128,66 +128,74 @@ def simulate_purchase():
     try:
         logging.info("Simulating purchase")
         
-        with db.engine.begin() as connection:
-            # Ensure visit_id exists
-            visit_id = 1
-            visit_query = sqlalchemy.text("SELECT visit_id FROM customer_visits WHERE visit_id = :visit_id")
-            visit_exists = connection.execute(visit_query, {'visit_id': visit_id}).fetchone()
+        with db.engine.connect() as connection:
+            trans = connection.begin()
 
-            if not visit_exists:
-                logging.info("Creating new customer visit with visit_id = 1")
+            try:
+                # Ensure visit_id exists
+                visit_id = 1
+                visit_query = sqlalchemy.text("SELECT visit_id FROM customer_visits WHERE visit_id = :visit_id")
+                visit_exists = connection.execute(visit_query, {'visit_id': visit_id}).fetchone()
+
+                if not visit_exists:
+                    logging.info("Creating new customer visit with visit_id = 1")
+                    connection.execute(sqlalchemy.text("""
+                        INSERT INTO customer_visits (customer_name, visit_timestamp)
+                        VALUES ('Test Customer', :visit_timestamp)
+                    """), {'visit_timestamp': datetime.datetime.now()})
+                    # No commit here; transaction managed by context
+
+                # Ensure cart_id exists
+                cart_id = 1
+                cart_query = sqlalchemy.text("SELECT cart_id FROM carts WHERE cart_id = :cart_id")
+                cart_exists = connection.execute(cart_query, {'cart_id': cart_id}).fetchone()
+
+                if not cart_exists:
+                    logging.info("Creating new cart with cart_id = 1")
+                    connection.execute(sqlalchemy.text("""
+                        INSERT INTO carts (visit_id, created_at)
+                        VALUES (:visit_id, :created_at)
+                    """), {'visit_id': visit_id, 'created_at': datetime.datetime.now()})
+                    # No commit here; transaction managed by context
+
+                # Add item to cart
+                logging.info("Adding item to cart")
                 connection.execute(sqlalchemy.text("""
-                    INSERT INTO customer_visits (customer_name, visit_timestamp)
-                    VALUES ('Test Customer', :visit_timestamp)
-                """), {'visit_timestamp': datetime.datetime.now()})
-                connection.commit()  # Commit the transaction to ensure the visit_id is available
-
-            # Ensure cart_id exists
-            cart_id = 1
-            cart_query = sqlalchemy.text("SELECT cart_id FROM carts WHERE cart_id = :cart_id")
-            cart_exists = connection.execute(cart_query, {'cart_id': cart_id}).fetchone()
-
-            if not cart_exists:
-                logging.info("Creating new cart with cart_id = 1")
-                connection.execute(sqlalchemy.text("""
-                    INSERT INTO carts (visit_id, created_at)
-                    VALUES (:visit_id, :created_at)
-                """), {'visit_id': visit_id, 'created_at': datetime.datetime.now()})
-                connection.commit()  # Commit the transaction to ensure the cart_id is available
-
-            # Add item to cart
-            logging.info("Adding item to cart")
-            connection.execute(sqlalchemy.text("""
-                INSERT INTO cart_items (cart_id, item_sku, quantity)
-                VALUES (:cart_id, 'RP-001', 1)
-                ON CONFLICT (cart_id, item_sku) DO UPDATE SET quantity = EXCLUDED.quantity
-            """), {'cart_id': cart_id})
-            
-            # Perform checkout
-            logging.info("Performing checkout")
-            items_query = sqlalchemy.text("SELECT item_sku, quantity FROM cart_items WHERE cart_id = :cart_id")
-            items = connection.execute(items_query, {'cart_id': cart_id}).fetchall()
-
-            total_cost = 0
-            for item in items:
-                price_query = sqlalchemy.text("SELECT price FROM potion_mixes WHERE sku = :sku")
-                price = connection.execute(price_query, {'sku': item['item_sku']}).scalar()
-                total_cost += price * item['quantity']
+                    INSERT INTO cart_items (cart_id, item_sku, quantity)
+                    VALUES (:cart_id, 'RP-001', 1)
+                    ON CONFLICT (cart_id, item_sku) DO UPDATE SET quantity = EXCLUDED.quantity
+                """), {'cart_id': cart_id})
                 
-                logging.info(f"Adding ledger entry for {item['item_sku']}")
+                # Perform checkout
+                logging.info("Performing checkout")
+                items_query = sqlalchemy.text("SELECT item_sku, quantity FROM cart_items WHERE cart_id = :cart_id")
+                items = connection.execute(items_query, {'cart_id': cart_id}).fetchall()
+
+                total_cost = 0
+                for item in items:
+                    price_query = sqlalchemy.text("SELECT price FROM potion_mixes WHERE sku = :sku")
+                    price = connection.execute(price_query, {'sku': item['item_sku']}).scalar()
+                    total_cost += price * item['quantity']
+                    
+                    logging.info(f"Adding ledger entry for {item['item_sku']}")
+                    connection.execute(sqlalchemy.text("""
+                        INSERT INTO inventory_ledger (item_type, item_id, change_amount, description, date)
+                        VALUES ('potion', :item_id, -:quantity, 'sale', :date)
+                    """), {'item_id': item['item_sku'], 'quantity': item['quantity'], 'date': datetime.datetime.now()})
+
+                logging.info("Updating gold ledger")
                 connection.execute(sqlalchemy.text("""
                     INSERT INTO inventory_ledger (item_type, item_id, change_amount, description, date)
-                    VALUES ('potion', :item_id, -:quantity, 'sale', :date)
-                """), {'item_id': item['item_sku'], 'quantity': item['quantity'], 'date': datetime.datetime.now()})
+                    VALUES ('gold', 'N/A', :amount, 'sale income', :date)
+                """), {'amount': total_cost, 'date': datetime.datetime.now()})
 
-            logging.info("Updating gold ledger")
-            connection.execute(sqlalchemy.text("""
-                INSERT INTO inventory_ledger (item_type, item_id, change_amount, description, date)
-                VALUES ('gold', 'N/A', :amount, 'sale income', :date)
-            """), {'amount': total_cost, 'date': datetime.datetime.now()})
+                logging.info("Clearing cart")
+                connection.execute(sqlalchemy.text("DELETE FROM cart_items WHERE cart_id = :cart_id"), {'cart_id': cart_id})
 
-            logging.info("Clearing cart")
-            connection.execute(sqlalchemy.text("DELETE FROM cart_items WHERE cart_id = :cart_id"), {'cart_id': cart_id})
+                trans.commit()
+            except Exception as e:
+                trans.rollback()
+                raise e
 
         return {"status": "Simulated purchase completed successfully"}
     except sqlalchemy.exc.SQLAlchemyError as e:
@@ -196,4 +204,3 @@ def simulate_purchase():
     except Exception as e:
         logging.error(f"Unexpected error during simulated purchase: {e}")
         raise HTTPException(status_code=500, detail="Unexpected error during simulated purchase.")
-

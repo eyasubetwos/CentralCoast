@@ -133,7 +133,7 @@ def simulate_purchase():
             logging.info("Adding item to cart")
             connection.execute(sqlalchemy.text("""
                 INSERT INTO cart_items (cart_id, item_sku, quantity) 
-                VALUES (1, 'RED_POTION', 1)
+                VALUES (1, 'RP-001', 1)
                 ON CONFLICT (cart_id, item_sku) DO UPDATE SET quantity = EXCLUDED.quantity
             """))
             
@@ -170,3 +170,4 @@ def simulate_purchase():
     except Exception as e:
         logging.error(f"Unexpected error during simulated purchase: {e}")
         raise HTTPException(status_code=500, detail="Unexpected error during simulated purchase.")
+ error during simulated purchase.")

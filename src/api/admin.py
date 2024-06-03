@@ -31,6 +31,12 @@ def reset():
                 VALUES ('gold', 'N/A', 100, 'Reset gold to initial state', :date)
             """), {'date': datetime.datetime.now()})
 
+            # Clearing any customer visit logs and carts first
+            logging.info("Clearing customer visits and carts...")
+            connection.execute(sqlalchemy.text("DELETE FROM cart_items"))
+            connection.execute(sqlalchemy.text("DELETE FROM carts"))
+            connection.execute(sqlalchemy.text("DELETE FROM customer_visits"))
+
             # Clearing and resetting potion mixes
             logging.info("Clearing potion mixes...")
             connection.execute(sqlalchemy.text("DELETE FROM potion_mixes"))
@@ -47,12 +53,6 @@ def reset():
                     INSERT INTO potion_mixes (name, potion_composition, sku, price, inventory_quantity)
                     VALUES (:name, :potion_composition, :sku, :price, :inventory_quantity)
                 """), potion)
-
-            # Clearing any customer visit logs and carts
-            logging.info("Clearing customer visits and carts...")
-            connection.execute(sqlalchemy.text("DELETE FROM customer_visits"))
-            connection.execute(sqlalchemy.text("DELETE FROM carts"))
-            connection.execute(sqlalchemy.text("DELETE FROM cart_items"))
 
             logging.info("Game state has been reset successfully.")
         return {"status": "Game state reset successfully."}

@@ -28,7 +28,7 @@ def reset():
             logging.info("Resetting global inventory gold via ledger...")
             connection.execute(sqlalchemy.text("""
                 INSERT INTO inventory_ledger (item_type, item_id, change_amount, description, date)
-                VALUES ('gold', 'N/A', 100 - (SELECT SUM(change_amount) FROM inventory_ledger WHERE item_type = 'gold'), 'Reset gold to initial state', :date)
+                VALUES ('gold', 'N/A', 100 - COALESCE((SELECT SUM(change_amount) FROM inventory_ledger WHERE item_type = 'gold'), 0), 'Reset gold to initial state', :date)
             """), {'date': datetime.datetime.now()})
 
             # Clearing and resetting potion mixes

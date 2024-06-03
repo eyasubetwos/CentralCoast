@@ -128,18 +128,30 @@ def simulate_purchase():
     try:
         logging.info("Simulating purchase")
         with db.engine.begin() as connection:
+            # Check if cart exists, if not, create a new one
+            cart_id = 1
+            cart_query = sqlalchemy.text("SELECT cart_id FROM carts WHERE cart_id = :cart_id")
+            cart_exists = connection.execute(cart_query, {'cart_id': cart_id}).fetchone()
+
+            if not cart_exists:
+                logging.info("Creating new cart with cart_id = 1")
+                connection.execute(sqlalchemy.text("""
+                    INSERT INTO carts (visit_id, created_at)
+                    VALUES (1, :created_at)
+                """), {'created_at': datetime.datetime.now()})
+
             # Add item to cart
             logging.info("Adding item to cart")
             connection.execute(sqlalchemy.text("""
-                INSERT INTO cart_items (cart_id, item_sku, quantity) 
-                VALUES (1, 'RP-001', 1)
+                INSERT INTO cart_items (cart_id, item_sku, quantity)
+                VALUES (:cart_id, 'RP-001', 1)
                 ON CONFLICT (cart_id, item_sku) DO UPDATE SET quantity = EXCLUDED.quantity
-            """))
+            """), {'cart_id': cart_id})
             
             # Perform checkout
             logging.info("Performing checkout")
             items_query = sqlalchemy.text("SELECT item_sku, quantity FROM cart_items WHERE cart_id = :cart_id")
-            items = connection.execute(items_query, {'cart_id': 1}).fetchall()
+            items = connection.execute(items_query, {'cart_id': cart_id}).fetchall()
 
             total_cost = 0
             for item in items:
@@ -160,7 +172,7 @@ def simulate_purchase():
             """), {'amount': total_cost, 'date': datetime.datetime.now()})
 
             logging.info("Clearing cart")
-            connection.execute(sqlalchemy.text("DELETE FROM cart_items WHERE cart_id = :cart_id"), {'cart_id': 1})
+            connection.execute(sqlalchemy.text("DELETE FROM cart_items WHERE cart_id = :cart_id"), {'cart_id': cart_id})
 
         return {"status": "Simulated purchase completed successfully"}
     except sqlalchemy.exc.SQLAlchemyError as e:
@@ -169,3 +181,4 @@ def simulate_purchase():
     except Exception as e:
         logging.error(f"Unexpected error during simulated purchase: {e}")
         raise HTTPException(status_code=500, detail="Unexpected error during simulated purchase.")
+

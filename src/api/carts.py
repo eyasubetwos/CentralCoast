@@ -123,7 +123,6 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
         logging.error(f"Error during checkout: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @router.post("/simulate_purchase")
 def simulate_purchase():
     try:
@@ -170,4 +169,3 @@ def simulate_purchase():
     except Exception as e:
         logging.error(f"Unexpected error during simulated purchase: {e}")
         raise HTTPException(status_code=500, detail="Unexpected error during simulated purchase.")
- error during simulated purchase.")

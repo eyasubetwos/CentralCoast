@@ -127,8 +127,9 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
 def simulate_purchase():
     try:
         logging.info("Simulating purchase")
+        
         with db.engine.begin() as connection:
-            # Check if visit exists, if not, create a new one
+            # Ensure visit_id exists
             visit_id = 1
             visit_query = sqlalchemy.text("SELECT visit_id FROM customer_visits WHERE visit_id = :visit_id")
             visit_exists = connection.execute(visit_query, {'visit_id': visit_id}).fetchone()
@@ -139,8 +140,9 @@ def simulate_purchase():
                     INSERT INTO customer_visits (customer_name, visit_timestamp)
                     VALUES ('Test Customer', :visit_timestamp)
                 """), {'visit_timestamp': datetime.datetime.now()})
+                connection.commit()  # Commit the transaction to ensure the visit_id is available
 
-            # Check if cart exists, if not, create a new one
+            # Ensure cart_id exists
             cart_id = 1
             cart_query = sqlalchemy.text("SELECT cart_id FROM carts WHERE cart_id = :cart_id")
             cart_exists = connection.execute(cart_query, {'cart_id': cart_id}).fetchone()
@@ -151,6 +153,7 @@ def simulate_purchase():
                     INSERT INTO carts (visit_id, created_at)
                     VALUES (:visit_id, :created_at)
                 """), {'visit_id': visit_id, 'created_at': datetime.datetime.now()})
+                connection.commit()  # Commit the transaction to ensure the cart_id is available
 
             # Add item to cart
             logging.info("Adding item to cart")

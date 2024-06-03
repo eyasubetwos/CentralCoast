@@ -1,5 +1,5 @@
 from apscheduler.schedulers.background import BackgroundScheduler
-from src.api.barrels import purchase_barrels_if_needed
+from src.utils import purchase_barrels_if_needed
 
 def start_scheduler():
     scheduler = BackgroundScheduler()

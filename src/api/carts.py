@@ -172,14 +172,14 @@ def simulate_purchase():
                 total_cost = 0
                 for item in items:
                     price_query = sqlalchemy.text("SELECT price FROM potion_mixes WHERE sku = :sku")
-                    price = connection.execute(price_query, {'sku': item['item_sku']}).scalar()
-                    total_cost += price * item['quantity']
+                    price = connection.execute(price_query, {'sku': item[0]}).scalar()  # Use item[0] to access the first column 'item_sku'
+                    total_cost += price * item[1]  # Use item[1] to access the second column 'quantity'
                     
-                    logging.info(f"Adding ledger entry for {item['item_sku']}")
+                    logging.info(f"Adding ledger entry for {item[0]}")
                     connection.execute(sqlalchemy.text("""
                         INSERT INTO inventory_ledger (item_type, item_id, change_amount, description, date)
                         VALUES ('potion', :item_id, -:quantity, 'sale', :date)
-                    """), {'item_id': item['item_sku'], 'quantity': item['quantity'], 'date': datetime.datetime.now()})
+                    """), {'item_id': item[0], 'quantity': item[1], 'date': datetime.datetime.now()})
 
                 logging.info("Updating gold ledger")
                 connection.execute(sqlalchemy.text("""

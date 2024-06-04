@@ -40,13 +40,14 @@ def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
                     VALUES ('gold', 'N/A', -:cost, 'barrel purchase', :date)
                 """), {'cost': barrel.price * barrel.quantity, 'date': datetime.datetime.now()})
 
-            # Sync the global inventory after delivering barrels
+            # Call sync function
             sync_global_inventory()
 
+            logging.info(f"Barrels delivered and inventory updated for order_id {order_id}")
         return {"status": f"Barrels delivered and inventory updated for order_id {order_id}"}
     except Exception as e:
+        logging.error(f"Unexpected error during barrel delivery: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @router.post("/plan")
 def get_wholesale_purchase_plan():

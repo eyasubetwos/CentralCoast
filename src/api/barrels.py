@@ -4,6 +4,7 @@ from src.api import auth
 import sqlalchemy
 from src import database as db
 import datetime
+from src.api.inventory import sync_global_inventory
 
 router = APIRouter(
     prefix="/barrels",
@@ -39,9 +40,13 @@ def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
                     VALUES ('gold', 'N/A', -:cost, 'barrel purchase', :date)
                 """), {'cost': barrel.price * barrel.quantity, 'date': datetime.datetime.now()})
 
+            # Sync the global inventory after delivering barrels
+            sync_global_inventory()
+
         return {"status": f"Barrels delivered and inventory updated for order_id {order_id}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.post("/plan")
 def get_wholesale_purchase_plan():

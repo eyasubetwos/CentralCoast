@@ -128,81 +128,32 @@ def deliver_capacity_plan(order_id: int):
 def sync_global_inventory():
     try:
         with db.engine.begin() as connection:
-            # Sum all ledger entries for potions and update the global_inventory
-            potion_query = sqlalchemy.text("""
-                SELECT item_id, SUM(change_amount) AS total_quantity
+            # Calculate current inventory totals from the ledger
+            ledger_query = sqlalchemy.text("""
+                SELECT item_type, item_id, SUM(change_amount) AS total
                 FROM inventory_ledger
-                WHERE item_type = 'potion'
-                GROUP BY item_id
+                GROUP BY item_type, item_id
             """)
-            potion_result = connection.execute(potion_query).fetchall()
+            ledger_result = connection.execute(ledger_query).fetchall()
+            inventory_totals = {}
+            for item in ledger_result:
+                item_type = item[0]
+                item_id = item[1]
+                total = item[2]
+                if item_type not in inventory_totals:
+                    inventory_totals[item_type] = {}
+                inventory_totals[item_type][item_id] = total
 
-            # Initialize inventory dictionary
-            inventory = {
-                "num_green_potions": 0,
-                "num_red_potions": 0,
-                "num_blue_potions": 0,
-                "num_green_ml": 0,
-                "num_red_ml": 0,
-                "num_blue_ml": 0,
-                "gold": 0
-            }
-
-            # Update potion inventory
-            for row in potion_result:
-                if row['item_id'] == 'GP-001':
-                    inventory["num_green_potions"] = row['total_quantity']
-                elif row['item_id'] == 'RP-001':
-                    inventory["num_red_potions"] = row['total_quantity']
-                elif row['item_id'] == 'BP-001':
-                    inventory["num_blue_potions"] = row['total_quantity']
-
-            # Sum all ledger entries for ml and update the global_inventory
-            ml_query = sqlalchemy.text("""
-                SELECT item_id, SUM(change_amount) AS total_quantity
-                FROM inventory_ledger
-                WHERE item_type = 'ml'
-                GROUP BY item_id
-            """)
-            ml_result = connection.execute(ml_query).fetchall()
-
-            # Update ml inventory
-            for row in ml_result:
-                if row['item_id'] == 'green_ml':
-                    inventory["num_green_ml"] = row['total_quantity']
-                elif row['item_id'] == 'red_ml':
-                    inventory["num_red_ml"] = row['total_quantity']
-                elif row['item_id'] == 'blue_ml':
-                    inventory["num_blue_ml"] = row['total_quantity']
-
-            # Sum all ledger entries for gold and update the global_inventory
-            gold_query = sqlalchemy.text("""
-                SELECT SUM(change_amount) AS total_quantity
-                FROM inventory_ledger
-                WHERE item_type = 'gold'
-            """)
-            gold_result = connection.execute(gold_query).scalar()
-            inventory["gold"] = gold_result if gold_result is not None else 0
-
-            # Update global_inventory table
-            update_query = sqlalchemy.text("""
-                UPDATE global_inventory
-                SET
-                    num_green_potions = :num_green_potions,
-                    num_red_potions = :num_red_potions,
-                    num_blue_potions = :num_blue_potions,
-                    num_green_ml = :num_green_ml,
-                    num_red_ml = :num_red_ml,
-                    num_blue_ml = :num_blue_ml,
-                    gold = :gold
-                WHERE id = 1
-            """)
-            connection.execute(update_query, inventory)
-            logging.info("Global inventory synchronized with ledger.")
-
-    except sqlalchemy.exc.SQLAlchemyError as e:
-        logging.error(f"Database error during global inventory sync: {e}")
-        raise HTTPException(status_code=500, detail=f"Database error during global inventory sync: {e}")
+            # Sync the global inventory
+            connection.execute(sqlalchemy.text("UPDATE global_inventory SET num_green_potions = :num_green_potions, num_red_potions = :num_red_potions, num_blue_potions = :num_blue_potions, num_green_ml = :num_green_ml, num_red_ml = :num_red_ml, num_blue_ml = :num_blue_ml, gold = :gold"), {
+                'num_green_potions': inventory_totals.get('potion', {}).get('GP-001', 0),
+                'num_red_potions': inventory_totals.get('potion', {}).get('RP-001', 0),
+                'num_blue_potions': inventory_totals.get('potion', {}).get('BP-001', 0),
+                'num_green_ml': inventory_totals.get('ml', {}).get('GREEN_ML', 0),
+                'num_red_ml': inventory_totals.get('ml', {}).get('RED_ML', 0),
+                'num_blue_ml': inventory_totals.get('ml', {}).get('BLUE_ML', 0),
+                'gold': inventory_totals.get('gold', {}).get('N/A', 0),
+            })
     except Exception as e:
-        logging.error(f"Unexpected error during global inventory sync: {e}")
-        raise HTTPException(status_code=500, detail=f"Unexpected error during global inventory sync: {e}")
+        logging.error(f"Unexpected error during global inventory sync: {str(e)}")
+        raise HTTPException(status_code=500, detail="Unexpected error during global inventory sync.")

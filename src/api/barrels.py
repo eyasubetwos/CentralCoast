@@ -4,6 +4,7 @@ from src.api import auth
 import sqlalchemy
 from src import database as db
 import datetime
+import logging
 from src.api.inventory import sync_global_inventory
 
 router = APIRouter(

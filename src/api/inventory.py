@@ -24,12 +24,43 @@ def get_inventory():
         with db.engine.begin() as connection:
             # Calculate current inventory totals from the ledger
             ledger_query = sqlalchemy.text("""
-                SELECT item_type, SUM(change_amount) AS total
+                SELECT item_type, item_id, SUM(change_amount) AS total
                 FROM inventory_ledger
-                GROUP BY item_type
+                GROUP BY item_type, item_id
             """)
             ledger_result = connection.execute(ledger_query).fetchall()
-            inventory_totals = {item[0]: item[1] for item in ledger_result}
+
+            # Initialize totals
+            num_green_potions = 0
+            num_red_potions = 0
+            num_blue_potions = 0
+            num_green_ml = 0
+            num_red_ml = 0
+            num_blue_ml = 0
+            gold = 0
+
+            # Aggregate totals from ledger
+            for item in ledger_result:
+                item_type = item[0]
+                item_id = item[1]
+                total = item[2]
+
+                if item_type == 'potion':
+                    if item_id == 'GP-001':
+                        num_green_potions = total
+                    elif item_id == 'RP-001':
+                        num_red_potions = total
+                    elif item_id == 'BP-001':
+                        num_blue_potions = total
+                elif item_type == 'ml':
+                    if item_id == 'GREEN_ML':
+                        num_green_ml = total
+                    elif item_id == 'RED_ML':
+                        num_red_ml = total
+                    elif item_id == 'BLUE_ML':
+                        num_blue_ml = total
+                elif item_type == 'gold':
+                    gold = total
 
             # Get details for each potion type
             potion_query = sqlalchemy.text("SELECT name, sku, price, potion_composition FROM potion_mixes")
@@ -39,13 +70,19 @@ def get_inventory():
                     "name": potion[0],
                     "sku": potion[1],
                     "price": potion[2],
-                    "inventory_quantity": inventory_totals.get(potion[1], 0),
+                    "inventory_quantity": num_green_potions if potion[1] == 'GP-001' else num_red_potions if potion[1] == 'RP-001' else num_blue_potions,
                     "potion_composition": potion[3]
                 } for potion in potion_result
             ]
 
             return {
-                "inventory": potions
+                "inventory": potions,
+                "gold": gold,
+                "ml": {
+                    "green": num_green_ml,
+                    "red": num_red_ml,
+                    "blue": num_blue_ml,
+                }
             }
 
     except SQLAlchemyError as e:
@@ -125,71 +162,3 @@ def deliver_capacity_plan(order_id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
 
-def sync_global_inventory():
-    try:
-        with db.engine.begin() as connection:
-            # Calculate current inventory totals from the ledger
-            ledger_query = sqlalchemy.text("""
-                SELECT item_type, item_id, SUM(change_amount) AS total
-                FROM inventory_ledger
-                GROUP BY item_type, item_id
-            """)
-            ledger_result = connection.execute(ledger_query).fetchall()
-
-            # Initialize totals
-            num_green_potions = 0
-            num_red_potions = 0
-            num_blue_potions = 0
-            num_green_ml = 0
-            num_red_ml = 0
-            num_blue_ml = 0
-            gold = 0
-
-            # Aggregate totals from ledger
-            for item in ledger_result:
-                item_type = item[0]
-                item_id = item[1]
-                total = item[2]
-
-                if item_type == 'potion':
-                    if item_id == 'GP-001':
-                        num_green_potions = total
-                    elif item_id == 'RP-001':
-                        num_red_potions = total
-                    elif item_id == 'BP-001':
-                        num_blue_potions = total
-                elif item_type == 'ml':
-                    if item_id == 'green':
-                        num_green_ml = total
-                    elif item_id == 'red':
-                        num_red_ml = total
-                    elif item_id == 'blue':
-                        num_blue_ml = total
-                elif item_type == 'gold':
-                    gold = total
-
-            logging.info(f"Syncing global inventory: Green Potions={num_green_potions}, Red Potions={num_red_potions}, Blue Potions={num_blue_potions}, Green ML={num_green_ml}, Red ML={num_red_ml}, Blue ML={num_blue_ml}, Gold={gold}")
-
-            # Sync the global inventory
-            connection.execute(sqlalchemy.text("""
-                UPDATE global_inventory SET 
-                num_green_potions = :num_green_potions,
-                num_red_potions = :num_red_potions,
-                num_blue_potions = :num_blue_potions,
-                num_green_ml = :num_green_ml,
-                num_red_ml = :num_red_ml,
-                num_blue_ml = :num_blue_ml,
-                gold = :gold
-            """), {
-                'num_green_potions': num_green_potions,
-                'num_red_potions': num_red_potions,
-                'num_blue_potions': num_blue_potions,
-                'num_green_ml': num_green_ml,
-                'num_red_ml': num_red_ml,
-                'num_blue_ml': num_blue_ml,
-                'gold': gold,
-            })
-            logging.info("Global inventory synced successfully.")
-    except Exception as e:
-        logging.error(f"Unexpected error during global inventory sync: {str(e)}")
-        raise HTTPException(status_code=500, detail="Unexpected error during global inventory sync.")

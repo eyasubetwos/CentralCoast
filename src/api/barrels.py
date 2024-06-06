@@ -5,7 +5,6 @@ import sqlalchemy
 from src import database as db
 import datetime
 import logging
-from src.api.inventory import sync_global_inventory
 
 router = APIRouter(
     prefix="/barrels",
@@ -20,10 +19,10 @@ class Barrel(BaseModel):
     quantity: int
 
 @router.post("/deliver/{order_id}")
-def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
+def post_deliver_barrels(barrels_delivered: list[dict], order_id: int):
     try:
         with db.engine.begin() as connection:
-            total_cost = sum(barrel.price * barrel.quantity for barrel in barrels_delivered)
+            total_cost = sum(barrel['price'] * barrel['quantity'] for barrel in barrels_delivered)
             current_gold_query = sqlalchemy.text("SELECT SUM(change_amount) FROM inventory_ledger WHERE item_type = 'gold'")
             current_gold = connection.execute(current_gold_query).scalar() or 0
 
@@ -34,21 +33,23 @@ def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
                 connection.execute(sqlalchemy.text("""
                     INSERT INTO inventory_ledger (item_type, item_id, change_amount, description, date)
                     VALUES ('ml', :sku, :change_amount, 'barrel delivery', :date)
-                """), {'sku': barrel.sku, 'change_amount': barrel.ml_per_barrel * barrel.quantity, 'date': datetime.datetime.now()})
+                """), {'sku': barrel['sku'], 'change_amount': barrel['ml_per_barrel'] * barrel['quantity'], 'date': datetime.datetime.now()})
 
                 connection.execute(sqlalchemy.text("""
                     INSERT INTO inventory_ledger (item_type, item_id, change_amount, description, date)
                     VALUES ('gold', 'N/A', -:cost, 'barrel purchase', :date)
-                """), {'cost': barrel.price * barrel.quantity, 'date': datetime.datetime.now()})
+                """), {'cost': barrel['price'] * barrel['quantity'], 'date': datetime.datetime.now()})
 
-            # Call sync function
-            sync_global_inventory()
-
-            logging.info(f"Barrels delivered and inventory updated for order_id {order_id}")
+        logging.info(f"Barrels delivered and inventory updated for order_id {order_id}")
         return {"status": f"Barrels delivered and inventory updated for order_id {order_id}"}
+    except SQLAlchemyError as e:
+        logging.error(f"Database error during barrel delivery: {str(e)}")
+        raise HTTPException(status_code=500, detail="Database error during barrel delivery.")
     except Exception as e:
         logging.error(f"Unexpected error during barrel delivery: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Unexpected error during barrel delivery.")
+
+
 
 @router.post("/plan")
 def get_wholesale_purchase_plan():

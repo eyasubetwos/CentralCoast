@@ -22,84 +22,48 @@ class CapacityPurchase(BaseModel):
 def get_inventory():
     try:
         with db.engine.begin() as connection:
-            # Fetch initial values from global_inventory
-            global_inventory_query = sqlalchemy.text("""
-                SELECT gold, num_red_ml, num_green_ml, num_blue_ml, num_red_potions, num_green_potions, num_blue_potions
-                FROM global_inventory
-                WHERE id = 1
-            """)
-            global_inventory = connection.execute(global_inventory_query).fetchone()
-            if not global_inventory:
-                raise HTTPException(status_code=500, detail="Global inventory not initialized.")
-
-            # Initialize totals with global inventory values
-            inventory_totals = {
-                'gold': global_inventory['gold'],
-                'red_ml': global_inventory['num_red_ml'],
-                'green_ml': global_inventory['num_green_ml'],
-                'blue_ml': global_inventory['num_blue_ml'],
-                'red_potions': global_inventory['num_red_potions'],
-                'green_potions': global_inventory['num_green_potions'],
-                'blue_potions': global_inventory['num_blue_potions'],
-            }
-
-            # Sum up the changes from the inventory_ledger table
+            # Calculate current inventory totals from the ledger
             ledger_query = sqlalchemy.text("""
                 SELECT item_type, item_id, SUM(change_amount) AS total
                 FROM inventory_ledger
                 GROUP BY item_type, item_id
             """)
             ledger_result = connection.execute(ledger_query).fetchall()
-
-            # Update totals based on ledger entries
+            inventory_totals = {}
             for item in ledger_result:
-                item_type = item['item_type']
-                item_id = item['item_id']
-                total = item['total']
+                if item['item_type'] not in inventory_totals:
+                    inventory_totals[item['item_type']] = {}
+                inventory_totals[item['item_type']][item['item_id']] = item['total']
 
-                if item_type == 'gold':
-                    inventory_totals['gold'] += total
-                elif item_type == 'ml':
-                    if item_id == 'red':
-                        inventory_totals['red_ml'] += total
-                    elif item_id == 'green':
-                        inventory_totals['green_ml'] += total
-                    elif item_id == 'blue':
-                        inventory_totals['blue_ml'] += total
-                elif item_type == 'potion':
-                    if item_id == 'RP-001':
-                        inventory_totals['red_potions'] += total
-                    elif item_id == 'GP-001':
-                        inventory_totals['green_potions'] += total
-                    elif item_id == 'BP-001':
-                        inventory_totals['blue_potions'] += total
+            # Fetch initial values from global inventory
+            global_inventory_query = sqlalchemy.text("SELECT * FROM global_inventory WHERE id = 1")
+            global_inventory = connection.execute(global_inventory_query).fetchone()
+
+            # Merge ledger results with global inventory
+            gold = (global_inventory['gold'] + inventory_totals.get('gold', {}).get('N/A', 0)) if global_inventory else inventory_totals.get('gold', {}).get('N/A', 0)
+            ml = {
+                "red": (global_inventory['num_red_ml'] + inventory_totals.get('ml', {}).get('red', 0)) if global_inventory else inventory_totals.get('ml', {}).get('red', 0),
+                "green": (global_inventory['num_green_ml'] + inventory_totals.get('ml', {}).get('green', 0)) if global_inventory else inventory_totals.get('ml', {}).get('green', 0),
+                "blue": (global_inventory['num_blue_ml'] + inventory_totals.get('ml', {}).get('blue', 0)) if global_inventory else inventory_totals.get('ml', {}).get('blue', 0)
+            }
 
             # Get details for each potion type
             potion_query = sqlalchemy.text("SELECT name, sku, price, potion_composition FROM potion_mixes")
             potion_result = connection.execute(potion_query).fetchall()
             potions = [
                 {
-                    "name": potion[0],
-                    "sku": potion[1],
-                    "price": potion[2],
-                    "inventory_quantity": inventory_totals.get(potion[1], 0),
-                    "potion_composition": potion[3]
+                    "name": potion['name'],
+                    "sku": potion['sku'],
+                    "price": potion['price'],
+                    "inventory_quantity": inventory_totals.get('potion', {}).get(potion['sku'], 0),
+                    "potion_composition": potion['potion_composition']
                 } for potion in potion_result
             ]
 
             return {
-                "inventory": potions,
-                "gold": inventory_totals['gold'],
-                "ml": {
-                    "red": inventory_totals['red_ml'],
-                    "green": inventory_totals['green_ml'],
-                    "blue": inventory_totals['blue_ml']
-                },
-                "potions": {
-                    "red": inventory_totals['red_potions'],
-                    "green": inventory_totals['green_potions'],
-                    "blue": inventory_totals['blue_potions']
-                }
+                "gold": gold,
+                "ml": ml,
+                "potions": potions
             }
 
     except SQLAlchemyError as e:

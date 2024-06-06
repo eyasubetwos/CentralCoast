@@ -31,9 +31,9 @@ def get_inventory():
             ledger_result = connection.execute(ledger_query).fetchall()
             inventory_totals = {}
             for item in ledger_result:
-                if item['item_type'] not in inventory_totals:
-                    inventory_totals[item['item_type']] = {}
-                inventory_totals[item['item_type']][item['item_id']] = item['total']
+                if item[0] not in inventory_totals:
+                    inventory_totals[item[0]] = {}
+                inventory_totals[item[0]][item[1]] = item[2]
 
             # Fetch initial values from global inventory
             global_inventory_query = sqlalchemy.text("SELECT * FROM global_inventory WHERE id = 1")
@@ -52,11 +52,11 @@ def get_inventory():
             potion_result = connection.execute(potion_query).fetchall()
             potions = [
                 {
-                    "name": potion['name'],
-                    "sku": potion['sku'],
-                    "price": potion['price'],
-                    "inventory_quantity": inventory_totals.get('potion', {}).get(potion['sku'], 0),
-                    "potion_composition": potion['potion_composition']
+                    "name": potion[0],
+                    "sku": potion[1],
+                    "price": potion[2],
+                    "inventory_quantity": inventory_totals.get('potion', {}).get(potion[1], 0),
+                    "potion_composition": potion[3]
                 } for potion in potion_result
             ]
 
@@ -70,6 +70,8 @@ def get_inventory():
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
+
+
 
 
 @router.get("/plan")
